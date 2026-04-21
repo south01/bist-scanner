@@ -530,6 +530,171 @@
       font-size: 0.8rem;
       color: #a0aec0;
     }
+
+    /* ── Clickable ticker ──────────────────────────────────────────────── */
+    .clickable-ticker {
+      cursor: pointer;
+      color: #c05621;
+      text-decoration: underline dotted;
+      transition: color 0.15s;
+    }
+    .clickable-ticker:hover { color: #9c4221; }
+
+    /* ── Strategy Modal ────────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+      animation: slideUp 0.2s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(24px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.1rem 1.3rem 0.9rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-title {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+    .modal-ticker {
+      font-size: 1.4rem;
+      font-weight: 900;
+      color: var(--text);
+    }
+    .modal-company {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      color: var(--text-muted);
+      line-height: 1;
+      padding: 0.2rem 0.4rem;
+      border-radius: 6px;
+    }
+    .modal-close:hover { background: var(--bg); color: var(--text); }
+
+    .modal-body { padding: 1.2rem 1.3rem; }
+
+    /* Stock info row */
+    .modal-info-row {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-info-item { display: flex; flex-direction: column; gap: 2px; }
+    .modal-info-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+    .modal-info-value { font-size: 1.05rem; font-weight: 700; color: var(--text); }
+
+    /* Strategy section */
+    .strategy-section { margin-bottom: 1.2rem; }
+    .strategy-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 0.6rem;
+    }
+
+    /* Entry zone */
+    .entry-box {
+      background: #fffbeb;
+      border: 1px solid #f6e05e;
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .entry-box-title { font-size: 0.78rem; font-weight: 700; color: #744210; margin-bottom: 0.2rem; }
+    .entry-box-value { font-size: 1.1rem; font-weight: 800; color: #744210; }
+    .entry-box-note { font-size: 0.78rem; color: #92400e; margin-top: 0.25rem; }
+
+    /* Levels grid */
+    .levels-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.6rem;
+      margin-bottom: 0.75rem;
+    }
+    .level-card {
+      border-radius: 10px;
+      padding: 0.65rem 0.75rem;
+      text-align: center;
+    }
+    .level-card.sl  { background: #fff5f5; border: 1px solid #fc8181; }
+    .level-card.tp1 { background: #f0fff4; border: 1px solid #68d391; }
+    .level-card.tp2 { background: #ebf8ff; border: 1px solid #63b3ed; }
+    .level-card-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
+    .level-card.sl  .level-card-label { color: #c53030; }
+    .level-card.tp1 .level-card-label { color: #276749; }
+    .level-card.tp2 .level-card-label { color: #2c5282; }
+    .level-card-price { font-size: 1.05rem; font-weight: 800; color: var(--text); }
+    .level-card-pct { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* Risk bar */
+    .risk-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 0.6rem 0.9rem;
+      font-size: 0.85rem;
+      flex-wrap: wrap;
+    }
+    .risk-label { color: var(--text-muted); font-size: 0.78rem; }
+    .risk-value { font-weight: 700; color: #c53030; }
+    .rr-value  { font-weight: 700; color: #276749; }
+
+    /* Notes */
+    .strategy-notes {
+      background: #f7fafc;
+      border-radius: 8px;
+      padding: 0.75rem 0.9rem;
+      font-size: 0.82rem;
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .strategy-notes strong { color: var(--text); }
+
+    /* Disclaimer */
+    .modal-disclaimer {
+      font-size: 0.72rem;
+      color: #a0aec0;
+      text-align: center;
+      padding: 0.75rem 1.3rem 1rem;
+      border-top: 1px solid var(--border);
+    }
   </style>
 </head>
 <body>
@@ -675,6 +840,49 @@
   </div>
 </div>
 
+<!-- Strategy Modal -->
+<div class="modal-overlay" id="strategyModal" onclick="closeModalOnOverlay(event)">
+  <div class="modal" id="modalBox">
+    <div class="modal-header">
+      <div class="modal-title">
+        <span class="modal-ticker" id="modalTicker"></span>
+        <span class="modal-company" id="modalCompany"></span>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Stock info -->
+      <div class="modal-info-row" id="modalInfoRow"></div>
+
+      <!-- Entry zone -->
+      <div class="strategy-section">
+        <div class="strategy-title">📍 Giriş Bölgesi</div>
+        <div class="entry-box">
+          <div class="entry-box-title">Önerilen Giriş</div>
+          <div class="entry-box-value" id="modalEntry"></div>
+          <div class="entry-box-note" id="modalEntryNote"></div>
+        </div>
+      </div>
+
+      <!-- Levels -->
+      <div class="strategy-section">
+        <div class="strategy-title">🎯 Seviyeler</div>
+        <div class="levels-grid" id="modalLevels"></div>
+        <div class="risk-bar-row" id="modalRiskBar"></div>
+      </div>
+
+      <!-- Notes -->
+      <div class="strategy-section">
+        <div class="strategy-title">📋 Strateji Notu</div>
+        <div class="strategy-notes" id="modalNotes"></div>
+      </div>
+    </div>
+    <div class="modal-disclaimer">
+      Bu bilgiler yalnızca kişisel analiz amaçlıdır. Yatırım tavsiyesi değildir.
+    </div>
+  </div>
+</div>
+
 <footer>EOD / Gecikmeli Veri • Yalnızca Kişisel Kullanım</footer>
 
 <script>
@@ -766,7 +974,7 @@
         <div class="card-top">
           <div class="card-left">
             <span class="card-rank">#${r.rank}</span>
-            <span class="card-ticker">${r.ticker}</span>
+            <span class="card-ticker clickable-ticker" onclick='openStrategy(${JSON.stringify(r)})'>${r.ticker}</span>
             <span class="card-name">${r.company_name}</span>
           </div>
           <div class="card-right">
@@ -794,7 +1002,7 @@
     const rows = results.map(r => `
       <tr>
         <td class="td-rank">${r.rank}</td>
-        <td class="td-ticker">${r.ticker}</td>
+        <td class="td-ticker"><span class="clickable-ticker" onclick='openStrategy(${JSON.stringify(r)})'>${r.ticker}</span></td>
         <td class="td-name">${r.company_name}</td>
         <td class="td-price">${fmtPrice(r.price)} ₺</td>
         <td class="${changeClass(r.change_pct)}">${fmtChange(r.change_pct)}</td>
@@ -941,6 +1149,134 @@
     box.textContent = '⚠️ ' + msg;
     box.classList.add('visible');
   }
+
+  // ── Strategy Modal ──────────────────────────────────────────────────────────
+
+  function openStrategy(r) {
+    const price    = r.price;
+    const chgPct   = r.change_pct;
+    const adr      = r.adr || 3.0;
+    const signals  = r.signals || [];
+
+    const prevClose   = price / (1 + chgPct / 100);
+    const hasGapCombo = signals.includes('Güçlü Momentum');
+    const hasGapUp    = signals.includes('Boşluk Yukarı');
+    const hasGap      = hasGapCombo || hasGapUp;
+
+    // ── Entry & SL logic ───────────────────────────────────────────────────
+    let entry, entryNote, sl;
+
+    if (hasGapCombo) {
+      // Strong gap+RVOL: wait for pullback to prev-close area
+      entry     = prevClose * 1.01;
+      entryNote = 'Gap-up açılış — ilk geri çekilmede veya konsolidasyon kırılımında gir. Açılışta kovalama yapma.';
+      sl        = prevClose * 0.985;
+    } else if (hasGapUp) {
+      entry     = price * 0.985;
+      entryNote = 'Boşluk yukarı — gün içi küçük geri çekilme beklenir.';
+      sl        = prevClose * 0.99;
+    } else {
+      // No gap: use ADR-based SL
+      entry     = price;
+      entryNote = 'Mevcut fiyat bölgesinde giriş yapılabilir.';
+      sl        = price * (1 - (adr / 100));
+    }
+
+    const risk = entry - sl;
+    const tp1  = entry + risk;           // 1:1 R/R
+    const tp2  = entry + risk * 2.0;     // 2:1 R/R
+
+    const riskPct  = ((entry - sl) / entry * 100).toFixed(1);
+    const tp1Pct   = ((tp1 - entry) / entry * 100).toFixed(1);
+    const tp2Pct   = ((tp2 - entry) / entry * 100).toFixed(1);
+
+    // ── Strategy notes ─────────────────────────────────────────────────────
+    const sizeMap = { S: 'Tam pozisyon', A: '2/3 pozisyon', B: '1/3 pozisyon', C: 'Küçük deneme' };
+    const posSize = sizeMap[r.tier] || 'Küçük deneme';
+
+    const noteLines = [];
+    if (hasGapCombo) noteLines.push('<strong>Gap+Hacim kombinasyonu:</strong> En güçlü setup. İlk 15 dk bekle, VWAP üzerinde kalmaya devam ederse gir.');
+    if (signals.includes('Güçlü RS')) noteLines.push('<strong>Güçlü RS:</strong> Endeksten belirgin üstün performans — süregelen ilgi var.');
+    if (signals.includes('52H Yakını')) noteLines.push('<strong>52H Yakını:</strong> Üst tarafta az direnç, trend devam edebilir.');
+    if (signals.includes('Yüksek ADR')) noteLines.push(`<strong>Yüksek ADR (${adr.toFixed(1)}%):</strong> Volatil hisse — stop çok sıkı tutulmamalı.`);
+    noteLines.push(`<strong>Pozisyon büyüklüğü (${r.tier} kademe):</strong> ${posSize}.`);
+    noteLines.push(`<strong>TP1\'de</strong> yarı pozisyonu kapat, kalan için stop\'u giriş fiyatına çek.`);
+
+    // ── Render modal ───────────────────────────────────────────────────────
+    document.getElementById('modalTicker').textContent  = r.ticker;
+    document.getElementById('modalCompany').textContent = r.company_name || '';
+
+    document.getElementById('modalInfoRow').innerHTML = `
+      <div class="modal-info-item">
+        <span class="modal-info-label">Fiyat</span>
+        <span class="modal-info-value">${fmtPrice(price)} ₺</span>
+      </div>
+      <div class="modal-info-item">
+        <span class="modal-info-label">Değişim</span>
+        <span class="modal-info-value ${changeClass(chgPct)}">${fmtChange(chgPct)}</span>
+      </div>
+      <div class="modal-info-item">
+        <span class="modal-info-label">RVOL</span>
+        <span class="modal-info-value">${fmtRvol(r.rvol)}</span>
+      </div>
+      <div class="modal-info-item">
+        <span class="modal-info-label">ADR</span>
+        <span class="modal-info-value">${adr.toFixed(1)}%</span>
+      </div>
+      <div class="modal-info-item">
+        <span class="modal-info-label">Puan / Kademe</span>
+        <span class="modal-info-value">${r.score} &nbsp;${tierBadge(r.tier)}</span>
+      </div>
+    `;
+
+    document.getElementById('modalEntry').textContent    = `${fmtPrice(entry)} ₺`;
+    document.getElementById('modalEntryNote').textContent = entryNote;
+
+    document.getElementById('modalLevels').innerHTML = `
+      <div class="level-card sl">
+        <div class="level-card-label">Stop Loss</div>
+        <div class="level-card-price">${fmtPrice(sl)} ₺</div>
+        <div class="level-card-pct">−${riskPct}%</div>
+      </div>
+      <div class="level-card tp1">
+        <div class="level-card-label">TP 1 (1:1)</div>
+        <div class="level-card-price">${fmtPrice(tp1)} ₺</div>
+        <div class="level-card-pct">+${tp1Pct}%</div>
+      </div>
+      <div class="level-card tp2">
+        <div class="level-card-label">TP 2 (2:1)</div>
+        <div class="level-card-price">${fmtPrice(tp2)} ₺</div>
+        <div class="level-card-pct">+${tp2Pct}%</div>
+      </div>
+    `;
+
+    document.getElementById('modalRiskBar').innerHTML = `
+      <span class="risk-label">Risk/İşlem:</span>
+      <span class="risk-value">${riskPct}%</span>
+      <span class="risk-label" style="margin-left:0.5rem">R/R Oranı:</span>
+      <span class="rr-value">1:2</span>
+      <span class="risk-label" style="margin-left:0.5rem">Önceki Kapanış:</span>
+      <span style="font-weight:600">${fmtPrice(prevClose)} ₺</span>
+    `;
+
+    document.getElementById('modalNotes').innerHTML = noteLines.join('<br>');
+
+    document.getElementById('strategyModal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    document.getElementById('strategyModal').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function closeModalOnOverlay(e) {
+    if (e.target === document.getElementById('strategyModal')) closeModal();
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+  });
 
   // On page load, check if there are already results
   window.addEventListener('load', async () => {

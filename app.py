@@ -103,6 +103,7 @@ def _serialize_results(results: list[StockResult]) -> list[dict]:
             "tier": r.tier,
             "signals": r.active_signals,
             "score_breakdown": r.score_breakdown,
+            "adr": r.adr,
         })
     # Re-rank after filtering
     for i, item in enumerate(out):
