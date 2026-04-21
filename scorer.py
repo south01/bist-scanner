@@ -50,6 +50,7 @@ class StockResult:
     tier: str = "-"
     active_signals: list = field(default_factory=list)
     score_breakdown: dict = field(default_factory=dict)
+    adr: float = 0.0
     error: Optional[str] = None
 
 
@@ -205,6 +206,7 @@ def _score_stock(ticker: str, hist: pd.DataFrame, index_change: float) -> StockR
 
         result.score = round(score, 2)
         result.tier = _compute_tier(result.score)
+        result.adr = adr
         result.active_signals = [SIGNALS[s]["label"] for s in active]
         result.score_breakdown = {
             "signals": [
