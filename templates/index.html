@@ -523,6 +523,18 @@
       margin-top: 0.3rem;
     }
 
+    /* ── AI Özet ───────────────────────────────────────────────────────── */
+    .ai-ozet-box {
+      background: linear-gradient(135deg, #fef9f0 0%, #fffdf7 100%);
+      border: 1px solid #f6ad55;
+      border-left: 4px solid #c05621;
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      font-size: 0.86rem;
+      color: var(--text);
+      line-height: 1.65;
+    }
+
     /* ── Footer ────────────────────────────────────────────────────────── */
     footer {
       text-align: center;
@@ -876,6 +888,12 @@
         <div class="strategy-title">📋 Strateji Notu</div>
         <div class="strategy-notes" id="modalNotes"></div>
       </div>
+
+      <!-- AI Özet -->
+      <div class="strategy-section">
+        <div class="strategy-title">✨ AI Özet</div>
+        <div class="ai-ozet-box" id="modalAiOzet"></div>
+      </div>
     </div>
     <div class="modal-disclaimer">
       Bu bilgiler yalnızca kişisel analiz amaçlıdır. Yatırım tavsiyesi değildir.
@@ -1150,6 +1168,84 @@
     box.classList.add('visible');
   }
 
+  // ── AI Özet generator ───────────────────────────────────────────────────────
+
+  function generateAiOzet(r) {
+    const signals  = r.signals || [];
+    const tier     = r.tier;
+    const chgPct   = r.change_pct;
+    const rvol     = r.rvol || 0;
+    const adr      = r.adr  || 0;
+    const sentences = [];
+
+    // 1. Ana sinyal cümlesi
+    if (signals.includes('Güçlü Momentum')) {
+      sentences.push(
+        `Bugün hem güçlü bir boşlukla açıldı hem de hacim normalin ${rvol.toFixed(1)} katına fırladı — ` +
+        `bu ikili kombinasyon, ciddi bir alıcı baskısının işaretidir.`
+      );
+    } else if (signals.includes('Boşluk Yukarı') && (signals.includes('Yüksek Hacim') || signals.includes('Artan Hacim'))) {
+      sentences.push(
+        `Önceki kapanışın belirgin üzerinde boşlukla açılırken işlem hacmi de normalin ${rvol.toFixed(1)} katına yükseldi.`
+      );
+    } else if (signals.includes('Boşluk Yukarı')) {
+      sentences.push(
+        `Önceki kapanışa göre %${Math.abs(chgPct).toFixed(1)} yukarıda boşlukla açıldı — güçlü bir alım iştahı var.`
+      );
+    } else if (signals.includes('Yüksek Hacim')) {
+      sentences.push(
+        `Olağandışı bir hacim patlaması yaşandı: bugünkü işlem hacmi 20 günlük ortalamanın ${rvol.toFixed(1)} katı. Bu kadar yüksek hacim genellikle büyük oyuncuların harekete geçtiğine işaret eder.`
+      );
+    } else if (signals.includes('Artan Hacim')) {
+      sentences.push(
+        `Normalden ${rvol.toFixed(1)} kat daha fazla hacimle işlem görüyor — belirgin bir ilgi artışı var ama henüz olağanüstü sayılmaz.`
+      );
+    } else if (signals.includes('Güçlü RS')) {
+      sentences.push(
+        `BIST 100'ü belirgin şekilde geride bırakarak öne çıktı — piyasadan bağımsız bir güç var.`
+      );
+    } else {
+      sentences.push(
+        `Birden fazla teknik göstergede olumlu sinyal verdi ve tarayıcının dikkatini çekti.`
+      );
+    }
+
+    // 2. Teyit cümleleri
+    const conf = [];
+    if (signals.includes('Güçlü RS') && !sentences[0].includes('geride bırak')) {
+      conf.push('BIST 100\'ü belirgin biçimde geride bırakıyor');
+    } else if (signals.includes('Pozitif RS')) {
+      conf.push('endeksten biraz daha iyi performans gösteriyor');
+    }
+    if (signals.includes('52H Yakını')) {
+      conf.push('52 haftalık zirvesinin yakınında işlem görüyor — önünde az direnç var');
+    }
+    if (signals.includes('EMA50 Üstü') && signals.includes('EMA20 Üstü')) {
+      conf.push('hem kısa hem orta vadeli trend yukarıda');
+    } else if (signals.includes('EMA50 Üstü')) {
+      conf.push('orta vadeli trend sağlıklı (EMA50 üzerinde)');
+    } else if (signals.includes('EMA20 Üstü')) {
+      conf.push('kısa vadeli trend yukarıda (EMA20 üzerinde)');
+    }
+    if (signals.includes('Yüksek ADR')) {
+      conf.push(`geniş günlük fiyat aralığıyla (ADR: %${adr.toFixed(1)}) oldukça volatil — hem fırsat hem risk içeriyor`);
+    }
+    if (conf.length) {
+      sentences.push(`Buna ek olarak: ${conf.join(', ')}.`);
+    }
+
+    // 3. Kapanış yorumu
+    const tierComment = {
+      'S': `En güçlü kurulum kategorisinde (S Kademe, puan: ${r.score}) — birden fazla kategoriden güçlü teyit var, yüksek konviksiyon sinyali.`,
+      'A': `Güçlü bir kurulum (A Kademe, puan: ${r.score}) — birden fazla kategoriden teyit alındı.`,
+      'B': `Makul bir kurulum (B Kademe, puan: ${r.score}) — dikkatli pozisyon boyutu önerilir.`,
+      'C': `Zayıf sinyal (C Kademe, puan: ${r.score}) — varsa sadece küçük bir deneme pozisyonu düşünülmeli.`,
+    };
+    sentences.push(tierComment[tier] || `Toplam puan ${r.score} — dikkatli olunması önerilir.`);
+
+    return sentences.join(' ');
+  }
+
   // ── Strategy Modal ──────────────────────────────────────────────────────────
 
   function openStrategy(r) {
@@ -1260,6 +1356,7 @@
     `;
 
     document.getElementById('modalNotes').innerHTML = noteLines.join('<br>');
+    document.getElementById('modalAiOzet').textContent = generateAiOzet(r);
 
     document.getElementById('strategyModal').classList.add('open');
     document.body.style.overflow = 'hidden';
