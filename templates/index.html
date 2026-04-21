@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BIST Tarayıcı</title>
+  <style>
+    /* ── Reset & Base ──────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #f5f6fa;
+      --surface:      #ffffff;
+      --border:       #e2e8f0;
+      --text:         #1a202c;
+      --text-muted:   #718096;
+      --green:        #22543d;
+      --green-bg:     #c6f6d5;
+      --red:          #742a2a;
+      --red-bg:       #fed7d7;
+      --neutral:      #4a5568;
+
+      /* Tier colors */
+      --s-bg:  #b7791f; --s-text: #ffffff;  /* gold */
+      --a-bg:  #2b6cb0; --a-text: #ffffff;  /* blue */
+      --b-bg:  #276749; --b-text: #ffffff;  /* green */
+      --c-bg:  #553c9a; --c-text: #ffffff;  /* purple */
+      --dash-bg: #a0aec0; --dash-text: #ffffff;
+
+      --radius: 12px;
+      --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+
+    html { font-size: 17px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 2rem;
+    }
+
+    /* ── Header ────────────────────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 2px solid var(--border);
+      padding: 1.2rem 1rem 1rem;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+    header h1 span { color: #c05621; }
+    .header-sub {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+
+    /* ── Main container ────────────────────────────────────────────────── */
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1.2rem 0.8rem;
+    }
+
+    /* ── Scan button ───────────────────────────────────────────────────── */
+    .scan-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    #scanBtn {
+      background: #c05621;
+      color: white;
+      border: none;
+      border-radius: 50px;
+      font-size: 1.4rem;
+      font-weight: 700;
+      padding: 0.85rem 3rem;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(192,86,33,0.35);
+      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+      letter-spacing: 0.04em;
+      min-width: 200px;
+    }
+    #scanBtn:hover:not(:disabled) {
+      background: #9c4221;
+      box-shadow: 0 6px 20px rgba(192,86,33,0.45);
+      transform: translateY(-1px);
+    }
+    #scanBtn:active:not(:disabled) { transform: scale(0.97); }
+    #scanBtn:disabled {
+      background: #a0aec0;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    /* ── Status bar ────────────────────────────────────────────────────── */
+    #statusBar {
+      display: none;
+      align-items: center;
+      gap: 0.6rem;
+      background: #ebf8ff;
+      border: 1px solid #bee3f8;
+      border-radius: 8px;
+      padding: 0.6rem 1rem;
+      font-size: 1rem;
+      color: #2c5282;
+      max-width: 460px;
+      width: 100%;
+    }
+    #statusBar.visible { display: flex; }
+    .spinner {
+      width: 20px; height: 20px;
+      border: 3px solid #bee3f8;
+      border-top-color: #2b6cb0;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #progressBar {
+      width: 100%;
+      max-width: 460px;
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 99px;
+      overflow: hidden;
+      display: none;
+    }
+    #progressBar.visible { display: block; }
+    #progressFill {
+      height: 100%;
+      background: #c05621;
+      border-radius: 99px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    /* ── Timestamp ─────────────────────────────────────────────────────── */
+    .timestamp-block {
+      text-align: center;
+      margin-bottom: 1.2rem;
+    }
+    .timestamp-adana {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+    .timestamp-kitchener {
+      font-size: 0.78rem;
+      color: #a0aec0;
+      margin-top: 2px;
+    }
+
+    /* ── Summary stats ─────────────────────────────────────────────────── */
+    .summary-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-bottom: 1.4rem;
+      justify-content: center;
+    }
+    .stat-pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      padding: 0.4rem 0.9rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .stat-pill.s { background: var(--s-bg); color: var(--s-text); }
+    .stat-pill.a { background: var(--a-bg); color: var(--a-text); }
+    .stat-pill.b { background: var(--b-bg); color: var(--b-text); }
+    .stat-pill.c { background: var(--c-bg); color: var(--c-text); }
+
+    /* ── Error ─────────────────────────────────────────────────────────── */
+    #errorBox {
+      display: none;
+      background: #fff5f5;
+      border: 1px solid #fc8181;
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+      color: #c53030;
+      font-size: 1rem;
+      margin-bottom: 1rem;
+    }
+    #errorBox.visible { display: block; }
+
+    /* ── Tier badge ────────────────────────────────────────────────────── */
+    .tier-badge {
+      display: inline-block;
+      border-radius: 50px;
+      font-size: 1rem;
+      font-weight: 800;
+      padding: 0.25rem 0.75rem;
+      min-width: 40px;
+      text-align: center;
+      letter-spacing: 0.04em;
+    }
+    .tier-S { background: var(--s-bg); color: var(--s-text); }
+    .tier-A { background: var(--a-bg); color: var(--a-text); }
+    .tier-B { background: var(--b-bg); color: var(--b-text); }
+    .tier-C { background: var(--c-bg); color: var(--c-text); }
+    .tier-- { background: var(--dash-bg); color: var(--dash-text); }
+
+    /* ── Change % badges ───────────────────────────────────────────────── */
+    .change-pos { color: var(--green); font-weight: 700; }
+    .change-neg { color: #c53030; font-weight: 700; }
+    .change-neu { color: var(--neutral); font-weight: 600; }
+
+    /* ── Signal tags ───────────────────────────────────────────────────── */
+    .signals { display: flex; flex-wrap: wrap; gap: 4px; }
+    .sig-tag {
+      background: #ebf4ff;
+      color: #2c5282;
+      border-radius: 50px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      white-space: nowrap;
+    }
+
+    /* ── MOBILE: Card layout (default) ────────────────────────────────── */
+    .cards-container { display: flex; flex-direction: column; gap: 0.8rem; }
+
+    .stock-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+      box-shadow: var(--shadow);
+      transition: box-shadow 0.15s;
+    }
+    .stock-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.13); }
+    .stock-card.tier-s-card { border-left: 4px solid var(--s-bg); }
+    .stock-card.tier-a-card { border-left: 4px solid var(--a-bg); }
+    .stock-card.tier-b-card { border-left: 4px solid var(--b-bg); }
+    .stock-card.tier-c-card { border-left: 4px solid var(--c-bg); }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .card-left { display: flex; align-items: center; gap: 0.6rem; }
+    .card-rank {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 700;
+      min-width: 22px;
+    }
+    .card-ticker {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+    .card-name {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-left: 0.2rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 180px;
+    }
+    .card-right { display: flex; align-items: center; gap: 0.5rem; }
+
+    .card-mid {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      margin-bottom: 0.55rem;
+      flex-wrap: wrap;
+    }
+    .card-price {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+    .card-meta {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .card-score {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    /* ── DESKTOP: Table layout ─────────────────────────────────────────── */
+    .table-container { display: none; }
+
+    .stock-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      font-size: 0.95rem;
+    }
+    .stock-table thead th {
+      background: #2d3748;
+      color: #e2e8f0;
+      padding: 0.75rem 0.9rem;
+      text-align: left;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .stock-table tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+    .stock-table tbody tr:last-child { border-bottom: none; }
+    .stock-table tbody tr:hover { background: #f7fafc; }
+    .stock-table td {
+      padding: 0.7rem 0.9rem;
+      vertical-align: middle;
+    }
+    .td-rank { color: var(--text-muted); font-size: 0.85rem; font-weight: 700; }
+    .td-ticker { font-weight: 800; font-size: 1rem; }
+    .td-name { color: var(--text-muted); font-size: 0.85rem; max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .td-price { font-weight: 700; font-size: 1rem; }
+    .td-score { font-weight: 800; font-size: 1.05rem; }
+
+    /* ── Responsive breakpoint ─────────────────────────────────────────── */
+    @media (min-width: 768px) {
+      .cards-container { display: none; }
+      .table-container { display: block; }
+      main { padding: 1.5rem 1.2rem; }
+    }
+
+    /* ── Empty state ───────────────────────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-muted);
+    }
+    .empty-state .big-icon { font-size: 3rem; margin-bottom: 0.5rem; }
+    .empty-state p { font-size: 1.1rem; }
+
+    /* ── Footer ────────────────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 1.2rem;
+      font-size: 0.8rem;
+      color: #a0aec0;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>BIST <span>Tarayıcı</span></h1>
+  <div class="header-sub">Borsa İstanbul • Kişisel Kullanım</div>
+</header>
+
+<main>
+  <!-- Scan button & status -->
+  <div class="scan-area">
+    <button id="scanBtn" onclick="startScan()">🔍 Tara</button>
+    <div id="statusBar">
+      <div class="spinner"></div>
+      <span id="statusText">Taranıyor... lütfen bekleyin</span>
+    </div>
+    <div id="progressBar"><div id="progressFill"></div></div>
+  </div>
+
+  <!-- Error box -->
+  <div id="errorBox"></div>
+
+  <!-- Timestamp -->
+  <div class="timestamp-block" id="timestampBlock" style="display:none">
+    <div class="timestamp-adana" id="tsAdana"></div>
+    <div class="timestamp-kitchener" id="tsKitchener"></div>
+  </div>
+
+  <!-- Summary pills -->
+  <div class="summary-row" id="summaryRow" style="display:none"></div>
+
+  <!-- Results: Mobile cards -->
+  <div class="cards-container" id="cardsContainer">
+    <div class="empty-state">
+      <div class="big-icon">📊</div>
+      <p>Taramayı başlatmak için <strong>Tara</strong> düğmesine basın.</p>
+    </div>
+  </div>
+
+  <!-- Results: Desktop table -->
+  <div class="table-container" id="tableContainer">
+    <div class="empty-state">
+      <div class="big-icon">📊</div>
+      <p>Taramayı başlatmak için <strong>Tara</strong> düğmesine basın.</p>
+    </div>
+  </div>
+</main>
+
+<footer>EOD / Gecikmeli Veri • Yalnızca Kişisel Kullanım</footer>
+
+<script>
+  let pollInterval = null;
+
+  function tierClass(tier) {
+    return { S: 'tier-S', A: 'tier-A', B: 'tier-B', C: 'tier-C' }[tier] || 'tier--';
+  }
+  function cardTierClass(tier) {
+    return { S: 'tier-s-card', A: 'tier-a-card', B: 'tier-b-card', C: 'tier-c-card' }[tier] || '';
+  }
+  function changeClass(v) {
+    if (v > 0) return 'change-pos';
+    if (v < 0) return 'change-neg';
+    return 'change-neu';
+  }
+  function fmtChange(v) {
+    const sign = v > 0 ? '+' : '';
+    return `${sign}${v.toFixed(2)}%`;
+  }
+  function fmtPrice(v) {
+    return v.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function fmtRvol(v) {
+    return v > 0 ? `${v.toFixed(1)}x` : '-';
+  }
+  function sigTags(signals) {
+    if (!signals || !signals.length) return '<span style="color:#a0aec0;font-size:0.8rem">—</span>';
+    return signals.map(s => `<span class="sig-tag">${s}</span>`).join('');
+  }
+  function tierBadge(tier) {
+    return `<span class="tier-badge ${tierClass(tier)}">${tier}</span>`;
+  }
+
+  function renderSummary(results) {
+    const counts = { S: 0, A: 0, B: 0, C: 0 };
+    results.forEach(r => { if (counts[r.tier] !== undefined) counts[r.tier]++; });
+    const total = results.length;
+    const row = document.getElementById('summaryRow');
+    row.style.display = 'flex';
+    row.innerHTML =
+      `<span class="stat-pill">Toplam: ${total}</span>` +
+      `<span class="stat-pill s">S: ${counts.S}</span>` +
+      `<span class="stat-pill a">A: ${counts.A}</span>` +
+      `<span class="stat-pill b">B: ${counts.B}</span>` +
+      `<span class="stat-pill c">C: ${counts.C}</span>`;
+  }
+
+  function renderCards(results) {
+    const container = document.getElementById('cardsContainer');
+    if (!results.length) {
+      container.innerHTML = '<div class="empty-state"><div class="big-icon">🔍</div><p>Sinyal bulunamadı.</p></div>';
+      return;
+    }
+    container.innerHTML = results.map(r => `
+      <div class="stock-card ${cardTierClass(r.tier)}">
+        <div class="card-top">
+          <div class="card-left">
+            <span class="card-rank">#${r.rank}</span>
+            <span class="card-ticker">${r.ticker}</span>
+            <span class="card-name">${r.company_name}</span>
+          </div>
+          <div class="card-right">
+            ${tierBadge(r.tier)}
+          </div>
+        </div>
+        <div class="card-mid">
+          <span class="card-price">${fmtPrice(r.price)} ₺</span>
+          <span class="${changeClass(r.change_pct)}">${fmtChange(r.change_pct)}</span>
+          <span class="card-meta">RVOL ${fmtRvol(r.rvol)}</span>
+          <span class="card-score">Puan: ${r.score}</span>
+        </div>
+        <div class="signals">${sigTags(r.signals)}</div>
+      </div>
+    `).join('');
+  }
+
+  function renderTable(results) {
+    const container = document.getElementById('tableContainer');
+    if (!results.length) {
+      container.innerHTML = '<div class="empty-state"><div class="big-icon">🔍</div><p>Sinyal bulunamadı.</p></div>';
+      return;
+    }
+    const rows = results.map(r => `
+      <tr>
+        <td class="td-rank">${r.rank}</td>
+        <td class="td-ticker">${r.ticker}</td>
+        <td class="td-name">${r.company_name}</td>
+        <td class="td-price">${fmtPrice(r.price)} ₺</td>
+        <td class="${changeClass(r.change_pct)}">${fmtChange(r.change_pct)}</td>
+        <td>${fmtRvol(r.rvol)}</td>
+        <td class="td-score">${r.score}</td>
+        <td>${tierBadge(r.tier)}</td>
+        <td><div class="signals">${sigTags(r.signals)}</div></td>
+      </tr>
+    `).join('');
+    container.innerHTML = `
+      <table class="stock-table">
+        <thead>
+          <tr>
+            <th>Sıra</th>
+            <th>Sembol</th>
+            <th>Şirket Adı</th>
+            <th>Fiyat (₺)</th>
+            <th>Değişim%</th>
+            <th>RVOL</th>
+            <th>Puan</th>
+            <th>Kademe</th>
+            <th>Aktif Sinyaller</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  function renderResults(results, tsAdana, tsKitchener) {
+    renderSummary(results);
+    renderCards(results);
+    renderTable(results);
+
+    if (tsAdana) {
+      document.getElementById('timestampBlock').style.display = 'block';
+      document.getElementById('tsAdana').textContent = `Son tarama: ${tsAdana} (Adana)`;
+      document.getElementById('tsKitchener').textContent = `Kitchener ON: ${tsKitchener}`;
+    }
+  }
+
+  async function startScan() {
+    const btn = document.getElementById('scanBtn');
+    const statusBar = document.getElementById('statusBar');
+    const progressBar = document.getElementById('progressBar');
+    const errorBox = document.getElementById('errorBox');
+
+    errorBox.classList.remove('visible');
+    btn.disabled = true;
+    statusBar.classList.add('visible');
+    progressBar.classList.add('visible');
+
+    try {
+      const res = await fetch('/api/scan', { method: 'POST' });
+      const data = await res.json();
+      if (!data.ok) {
+        showError(data.message || 'Tarama başlatılamadı.');
+        btn.disabled = false;
+        statusBar.classList.remove('visible');
+        progressBar.classList.remove('visible');
+        return;
+      }
+    } catch (e) {
+      showError('Sunucuya bağlanılamadı.');
+      btn.disabled = false;
+      statusBar.classList.remove('visible');
+      progressBar.classList.remove('visible');
+      return;
+    }
+
+    // Poll for progress
+    pollInterval = setInterval(pollStatus, 1500);
+  }
+
+  async function pollStatus() {
+    try {
+      const res = await fetch('/api/status');
+      const state = await res.json();
+
+      if (state.total > 0) {
+        const pct = Math.min(100, Math.round((state.progress / state.total) * 100));
+        document.getElementById('progressFill').style.width = pct + '%';
+        document.getElementById('statusText').textContent =
+          `Taranıyor... ${state.progress} / ${state.total} hisse`;
+      }
+
+      if (!state.running) {
+        clearInterval(pollInterval);
+        document.getElementById('scanBtn').disabled = false;
+        document.getElementById('statusBar').classList.remove('visible');
+        document.getElementById('progressBar').classList.remove('visible');
+        document.getElementById('progressFill').style.width = '0%';
+
+        if (state.error) {
+          showError(state.error);
+          return;
+        }
+        loadResults();
+      }
+    } catch (e) {
+      // Network hiccup — keep polling
+    }
+  }
+
+  async function loadResults() {
+    try {
+      const res = await fetch('/api/results');
+      const data = await res.json();
+      renderResults(data.results, data.last_scan_adana, data.last_scan_kitchener);
+    } catch (e) {
+      showError('Sonuçlar yüklenemedi.');
+    }
+  }
+
+  function showError(msg) {
+    const box = document.getElementById('errorBox');
+    box.textContent = '⚠️ ' + msg;
+    box.classList.add('visible');
+  }
+
+  // On page load, check if there are already results
+  window.addEventListener('load', async () => {
+    try {
+      const res = await fetch('/api/status');
+      const state = await res.json();
+      if (state.running) {
+        document.getElementById('scanBtn').disabled = true;
+        document.getElementById('statusBar').classList.add('visible');
+        document.getElementById('progressBar').classList.add('visible');
+        pollInterval = setInterval(pollStatus, 1500);
+      } else if (state.results && state.results.length) {
+        loadResults();
+      }
+    } catch (e) {}
+  });
+</script>
+</body>
+</html>
