@@ -8,6 +8,7 @@ import os
 import time
 import logging
 from datetime import datetime, timedelta
+from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
@@ -85,7 +86,7 @@ SEED_TICKERS = [
 ]
 
 
-def _load_cache() -> dict | None:
+def _load_cache() -> Optional[dict]:
     """Load cached ticker data if it exists and is fresh."""
     if not os.path.exists(CACHE_FILE):
         return None
@@ -116,7 +117,7 @@ def _save_cache(tickers: list[str], source: str) -> None:
     logger.info(f"Saved {len(tickers)} tickers from '{source}' to cache.")
 
 
-def _fetch_from_isyatirim() -> list[str] | None:
+def _fetch_from_isyatirim() -> Optional[list]:
     """
     Fetch BIST tickers from isyatirim.com.tr JSON API.
     Returns list of base tickers (without .IS suffix) or None on failure.
@@ -147,7 +148,7 @@ def _fetch_from_isyatirim() -> list[str] | None:
     return None
 
 
-def _fetch_from_kap() -> list[str] | None:
+def _fetch_from_kap() -> Optional[list]:
     """
     Fetch BIST tickers from KAP (Public Disclosure Platform) API.
     """
@@ -174,7 +175,7 @@ def _fetch_from_kap() -> list[str] | None:
     return None
 
 
-def _fetch_from_borsaistanbul() -> list[str] | None:
+def _fetch_from_borsaistanbul() -> Optional[list]:
     """
     Scrape BIST tickers from Borsa Istanbul public equity page.
     """
