@@ -344,6 +344,47 @@
       main { padding: 1.5rem 1.2rem; }
     }
 
+    /* ── Score filter bar ─────────────────────────────────────────────── */
+    .filter-bar {
+      display: none;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 1.2rem;
+    }
+    .filter-bar.visible { display: flex; }
+    .filter-label {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .filter-input {
+      width: 72px;
+      padding: 0.35rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      text-align: center;
+      background: var(--surface);
+      color: var(--text);
+    }
+    .filter-input:focus { outline: 2px solid #c05621; border-color: transparent; }
+    .filter-reset {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      padding: 0.3rem 0.75rem;
+      cursor: pointer;
+    }
+    .filter-reset:hover { background: var(--bg); }
+    .filter-count {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
     /* ── Empty state ───────────────────────────────────────────────────── */
     .empty-state {
       text-align: center;
@@ -352,6 +393,135 @@
     }
     .empty-state .big-icon { font-size: 3rem; margin-bottom: 0.5rem; }
     .empty-state p { font-size: 1.1rem; }
+
+    /* ── Score breakdown ───────────────────────────────────────────────── */
+    .breakdown-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      padding: 2px 8px;
+      cursor: pointer;
+      margin-top: 0.4rem;
+      transition: background 0.1s, color 0.1s;
+    }
+    .breakdown-btn:hover { background: var(--bg); color: var(--text); }
+
+    .breakdown-panel {
+      display: none;
+      margin-top: 0.5rem;
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+      font-size: 0.82rem;
+    }
+    .breakdown-panel.open { display: block; }
+    .breakdown-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+      color: var(--text);
+    }
+    .breakdown-row .sig-name { color: var(--text-muted); }
+    .breakdown-row .sig-weight { font-weight: 700; color: #276749; }
+    .breakdown-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 4px 0;
+    }
+    .breakdown-bonus { color: #c05621; font-weight: 600; font-size: 0.8rem; }
+    .breakdown-total { font-weight: 800; }
+
+    /* ── Table breakdown inline ────────────────────────────────────────── */
+    .td-score-wrap { display: flex; align-items: center; gap: 0.4rem; }
+
+    /* ── Indicator guide ───────────────────────────────────────────────── */
+    .guide-section {
+      max-width: 1200px;
+      margin: 0 auto 1.5rem;
+      padding: 0 0.8rem;
+    }
+    .guide-toggle {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem 1rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: var(--shadow);
+      transition: background 0.1s;
+    }
+    .guide-toggle:hover { background: var(--bg); }
+    .guide-toggle .arrow { transition: transform 0.2s; font-style: normal; }
+    .guide-toggle.open .arrow { transform: rotate(180deg); }
+
+    .guide-body {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      padding: 1rem 1rem 0.5rem;
+      box-shadow: var(--shadow);
+    }
+    .guide-body.open { display: block; }
+
+    .guide-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+    @media (min-width: 600px) {
+      .guide-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (min-width: 900px) {
+      .guide-grid { grid-template-columns: 1fr 1fr 1fr; }
+    }
+
+    .guide-card {
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 0.7rem 0.85rem;
+      border-left: 3px solid var(--border);
+    }
+    .guide-card.domain-momentum { border-color: #c05621; }
+    .guide-card.domain-volume   { border-color: #2b6cb0; }
+    .guide-card.domain-rs       { border-color: #276749; }
+    .guide-card.domain-structure{ border-color: #553c9a; }
+    .guide-card.domain-volatility{ border-color: #b7791f; }
+
+    .guide-card-name {
+      font-weight: 700;
+      font-size: 0.88rem;
+      color: var(--text);
+      margin-bottom: 0.2rem;
+    }
+    .guide-card-domain {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+    .guide-card-desc {
+      font-size: 0.82rem;
+      color: var(--text);
+      line-height: 1.45;
+    }
+    .guide-card-weight {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.3rem;
+    }
 
     /* ── Footer ────────────────────────────────────────────────────────── */
     footer {
@@ -392,6 +562,16 @@
   <!-- Summary pills -->
   <div class="summary-row" id="summaryRow" style="display:none"></div>
 
+  <!-- Score filter -->
+  <div class="filter-bar" id="filterBar">
+    <span class="filter-label">Puan Aralığı:</span>
+    <input class="filter-input" id="filterMin" type="number" min="0" step="0.1" placeholder="Min" oninput="applyFilter()">
+    <span class="filter-label">—</span>
+    <input class="filter-input" id="filterMax" type="number" min="0" step="0.1" placeholder="Max" oninput="applyFilter()">
+    <button class="filter-reset" onclick="resetFilter()">Temizle</button>
+    <span class="filter-count" id="filterCount"></span>
+  </div>
+
   <!-- Results: Mobile cards -->
   <div class="cards-container" id="cardsContainer">
     <div class="empty-state">
@@ -409,10 +589,97 @@
   </div>
 </main>
 
+<!-- Indicator guide -->
+<div class="guide-section">
+  <button class="guide-toggle" onclick="toggleGuide(this)">
+    📖 Göstergeler Nasıl Çalışır?
+    <i class="arrow">▾</i>
+  </button>
+  <div class="guide-body">
+    <div class="guide-grid">
+
+      <div class="guide-card domain-momentum">
+        <div class="guide-card-name">Güçlü Momentum</div>
+        <div class="guide-card-domain">Momentum</div>
+        <div class="guide-card-desc">Hisse hem %5'ten fazla boşlukla açılmış hem de o gün hacmi ortalamanın 3 katının üzerinde — bu ikili kombinasyon, ciddi bir alıcı baskısını gösterir.</div>
+        <div class="guide-card-weight">Ağırlık: 3.0</div>
+      </div>
+
+      <div class="guide-card domain-momentum">
+        <div class="guide-card-name">Boşluk Yukarı</div>
+        <div class="guide-card-domain">Momentum</div>
+        <div class="guide-card-desc">Hisse, önceki kapanışın %3'ten fazla üzerinde açılmış. Güçlü bir haber veya alım iştahı olduğunu işaret eder.</div>
+        <div class="guide-card-weight">Ağırlık: 1.5</div>
+      </div>
+
+      <div class="guide-card domain-volume">
+        <div class="guide-card-name">Yüksek Hacim (3×)</div>
+        <div class="guide-card-domain">Hacim</div>
+        <div class="guide-card-desc">Bugünün işlem hacmi, son 20 günün ortalamasının 3 katı veya üzerinde. Bu kadar yüksek hacim, büyük oyuncuların harekete geçtiğine işaret eder.</div>
+        <div class="guide-card-weight">Ağırlık: 2.0</div>
+      </div>
+
+      <div class="guide-card domain-volume">
+        <div class="guide-card-name">Artan Hacim (2×)</div>
+        <div class="guide-card-domain">Hacim</div>
+        <div class="guide-card-desc">Bugünün hacmi 20 günlük ortalamanın 2 katı civarında. Normalden belirgin şekilde daha fazla ilgi var, ama henüz olağanüstü sayılmaz.</div>
+        <div class="guide-card-weight">Ağırlık: 1.0</div>
+      </div>
+
+      <div class="guide-card domain-rs">
+        <div class="guide-card-name">Güçlü RS</div>
+        <div class="guide-card-domain">Göreceli Güç</div>
+        <div class="guide-card-desc">Hisse, BIST 100 endeksinden %3'ten fazla daha iyi performans gösteriyor. Piyasa düşerken bile yükselen ya da piyasadan çok daha hızlı yükselen hisseler bu sinyali alır.</div>
+        <div class="guide-card-weight">Ağırlık: 2.0</div>
+      </div>
+
+      <div class="guide-card domain-rs">
+        <div class="guide-card-name">Pozitif RS</div>
+        <div class="guide-card-domain">Göreceli Güç</div>
+        <div class="guide-card-desc">Hisse, BIST 100 endeksini %1'den fazla geride bırakıyor. Piyasanın biraz üzerinde bir güç var, ama fark henüz çarpıcı değil.</div>
+        <div class="guide-card-weight">Ağırlık: 1.0</div>
+      </div>
+
+      <div class="guide-card domain-structure">
+        <div class="guide-card-name">EMA20 Üstü</div>
+        <div class="guide-card-domain">Yapı</div>
+        <div class="guide-card-desc">Hisse fiyatı, 20 günlük üstel hareketli ortalamanın üzerinde. Kısa vadeli trendin yönü yukarı demektir.</div>
+        <div class="guide-card-weight">Ağırlık: 1.0</div>
+      </div>
+
+      <div class="guide-card domain-structure">
+        <div class="guide-card-name">EMA50 Üstü</div>
+        <div class="guide-card-domain">Yapı</div>
+        <div class="guide-card-desc">Fiyat, 50 günlük hareketli ortalamanın üzerinde seyrediyor. Orta vadeli trendin sağlıklı olduğunu ve hissenin "doğru tarafta" işlem gördüğünü gösterir.</div>
+        <div class="guide-card-weight">Ağırlık: 1.5</div>
+      </div>
+
+      <div class="guide-card domain-structure">
+        <div class="guide-card-name">52H Yakını</div>
+        <div class="guide-card-domain">Yapı</div>
+        <div class="guide-card-desc">Hisse, son 52 haftanın en yüksek seviyesinin %5 yakınında. Zirveye yakın işlem gören hisseler genellikle güçlü bir momentum içindedir.</div>
+        <div class="guide-card-weight">Ağırlık: 1.5</div>
+      </div>
+
+      <div class="guide-card domain-volatility">
+        <div class="guide-card-name">Yüksek ADR</div>
+        <div class="guide-card-domain">Volatilite</div>
+        <div class="guide-card-desc">Son 20 günün ortalama günlük fiyat aralığı (Gün İçi Yüksek−Düşük), kapanışa oranla %3'ün üzerinde. Hisse çok geniş salınımlar yapıyor — hem fırsat hem risk demektir.</div>
+        <div class="guide-card-weight">Ağırlık: 1.0</div>
+      </div>
+
+    </div>
+    <p style="margin-top:0.85rem; font-size:0.78rem; color:var(--text-muted); text-align:center;">
+      3 veya daha fazla farklı kategoriden sinyal gelirse toplam puan ×1.2 çarpanıyla artırılır (çeşitlilik bonusu).
+    </p>
+  </div>
+</div>
+
 <footer>EOD / Gecikmeli Veri • Yalnızca Kişisel Kullanım</footer>
 
 <script>
   let pollInterval = null;
+  let allResults = [];
 
   function tierClass(tier) {
     return { S: 'tier-S', A: 'tier-A', B: 'tier-B', C: 'tier-C' }[tier] || 'tier--';
@@ -438,6 +705,37 @@
   function sigTags(signals) {
     if (!signals || !signals.length) return '<span style="color:#a0aec0;font-size:0.8rem">—</span>';
     return signals.map(s => `<span class="sig-tag">${s}</span>`).join('');
+  }
+
+  function breakdownHTML(bd, id) {
+    if (!bd || !bd.signals || !bd.signals.length) return '';
+    const rows = bd.signals.map(s =>
+      `<div class="breakdown-row"><span class="sig-name">${s.label}</span><span class="sig-weight">+${s.weight.toFixed(1)}</span></div>`
+    ).join('');
+    const bonus = bd.diversity_bonus
+      ? `<div class="breakdown-row breakdown-bonus"><span>Çeşitlilik bonusu (×1.2)</span><span>+${(bd.final_score - bd.base_score).toFixed(2)}</span></div>`
+      : '';
+    return `
+      <button class="breakdown-btn" onclick="toggleBreakdown('${id}')">Puan Detayı ▾</button>
+      <div class="breakdown-panel" id="bd-${id}">
+        ${rows}
+        ${bd.diversity_bonus ? '<hr class="breakdown-divider">' + bonus : ''}
+        <hr class="breakdown-divider">
+        <div class="breakdown-row breakdown-total"><span>Toplam Puan</span><span>${bd.final_score}</span></div>
+      </div>
+    `;
+  }
+
+  function toggleBreakdown(id) {
+    const panel = document.getElementById('bd-' + id);
+    const btn = panel.previousElementSibling;
+    const open = panel.classList.toggle('open');
+    btn.textContent = open ? 'Puan Detayı ▴' : 'Puan Detayı ▾';
+  }
+
+  function toggleGuide(btn) {
+    btn.classList.toggle('open');
+    btn.nextElementSibling.classList.toggle('open');
   }
   function tierBadge(tier) {
     return `<span class="tier-badge ${tierClass(tier)}">${tier}</span>`;
@@ -482,6 +780,7 @@
           <span class="card-score">Puan: ${r.score}</span>
         </div>
         <div class="signals">${sigTags(r.signals)}</div>
+        ${breakdownHTML(r.score_breakdown, 'card-' + r.rank)}
       </div>
     `).join('');
   }
@@ -500,7 +799,9 @@
         <td class="td-price">${fmtPrice(r.price)} ₺</td>
         <td class="${changeClass(r.change_pct)}">${fmtChange(r.change_pct)}</td>
         <td>${fmtRvol(r.rvol)}</td>
-        <td class="td-score">${r.score}</td>
+        <td class="td-score">
+          <div class="td-score-wrap">${r.score}${breakdownHTML(r.score_breakdown, 'tbl-' + r.rank)}</div>
+        </td>
         <td>${tierBadge(r.tier)}</td>
         <td><div class="signals">${sigTags(r.signals)}</div></td>
       </tr>
@@ -525,10 +826,35 @@
     `;
   }
 
+  function applyFilter() {
+    const minVal = parseFloat(document.getElementById('filterMin').value);
+    const maxVal = parseFloat(document.getElementById('filterMax').value);
+    const filtered = allResults.filter(r => {
+      if (!isNaN(minVal) && r.score < minVal) return false;
+      if (!isNaN(maxVal) && r.score > maxVal) return false;
+      return true;
+    });
+    const countEl = document.getElementById('filterCount');
+    const isFiltered = !isNaN(minVal) || !isNaN(maxVal);
+    countEl.textContent = isFiltered ? `${filtered.length} / ${allResults.length} hisse` : '';
+    renderCards(filtered);
+    renderTable(filtered);
+  }
+
+  function resetFilter() {
+    document.getElementById('filterMin').value = '';
+    document.getElementById('filterMax').value = '';
+    document.getElementById('filterCount').textContent = '';
+    renderCards(allResults);
+    renderTable(allResults);
+  }
+
   function renderResults(results, tsAdana, tsKitchener) {
+    allResults = results;
     renderSummary(results);
     renderCards(results);
     renderTable(results);
+    document.getElementById('filterBar').classList.add('visible');
 
     if (tsAdana) {
       document.getElementById('timestampBlock').style.display = 'block';

@@ -49,6 +49,7 @@ class StockResult:
     score: float = 0.0
     tier: str = "-"
     active_signals: list = field(default_factory=list)
+    score_breakdown: dict = field(default_factory=dict)
     error: Optional[str] = None
 
 
@@ -197,13 +198,23 @@ def _score_stock(ticker: str, hist: pd.DataFrame, index_change: float) -> StockR
             score += w
             domains_hit.add(SIGNALS[sig]["domain"])
 
-        # Domain diversity multiplier
-        if len(domains_hit) >= DOMAIN_DIVERSITY_MIN:
+        base_score = score
+        diversity_bonus = len(domains_hit) >= DOMAIN_DIVERSITY_MIN
+        if diversity_bonus:
             score *= DOMAIN_DIVERSITY_MULTIPLIER
 
         result.score = round(score, 2)
         result.tier = _compute_tier(result.score)
         result.active_signals = [SIGNALS[s]["label"] for s in active]
+        result.score_breakdown = {
+            "signals": [
+                {"label": SIGNALS[s]["label"], "weight": SIGNALS[s]["weight"]}
+                for s in active
+            ],
+            "base_score": round(base_score, 2),
+            "diversity_bonus": diversity_bonus,
+            "final_score": result.score,
+        }
 
     except Exception as e:
         logger.warning(f"Score error for {ticker}: {e}")

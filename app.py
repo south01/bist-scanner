@@ -5,6 +5,7 @@ Run with: python app.py
 
 import json
 import logging
+import os
 import threading
 import time
 from datetime import datetime
@@ -101,6 +102,7 @@ def _serialize_results(results: list[StockResult]) -> list[dict]:
             "score": r.score,
             "tier": r.tier,
             "signals": r.active_signals,
+            "score_breakdown": r.score_breakdown,
         })
     # Re-rank after filtering
     for i, item in enumerate(out):
@@ -112,7 +114,11 @@ def _serialize_results(results: list[StockResult]) -> list[dict]:
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    resp = render_template("index.html")
+    from flask import make_response
+    r = make_response(resp)
+    r.headers["Cache-Control"] = "no-store"
+    return r
 
 
 @app.route("/api/scan", methods=["POST"])
@@ -172,4 +178,5 @@ if __name__ == "__main__":
     except Exception as e:
         logger.warning(f"Ticker ön yükleme hatası: {e}")
 
-    app.run(host="127.0.0.1", port=5050, debug=False)
+    port = int(os.environ.get("PORT", 5050))
+    app.run(host="0.0.0.0", port=port, debug=False)
