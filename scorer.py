@@ -297,6 +297,47 @@ def run_scan(
         if progress_callback:
             progress_callback(done_count, total)
 
+    # ── Step 2b: Patch today's close (yfinance omits it in multi-day downloads) ──
+    logger.info("Patching today's prices with period=1d download...")
+    today_batches = [tickers[i:i + BATCH_SIZE] for i in range(0, total, BATCH_SIZE)]
+    for batch in today_batches:
+        try:
+            batch_str = " ".join(batch)
+            today_raw = yf.download(
+                batch_str,
+                period="1d",
+                interval="1d",
+                progress=False,
+                auto_adjust=True,
+                group_by="ticker",
+                threads=True,
+            )
+            if today_raw is None or today_raw.empty:
+                continue
+            for ticker in batch:
+                if ticker not in all_hist:
+                    continue
+                try:
+                    if len(batch) == 1:
+                        today_df = today_raw.copy()
+                    else:
+                        if ticker not in today_raw.columns.get_level_values(0):
+                            continue
+                        today_df = today_raw[ticker].copy()
+                    today_df = today_df.dropna(how="all")
+                    if today_df.empty:
+                        continue
+                    last_today = today_df.index[-1]
+                    hist = all_hist[ticker]
+                    if last_today not in hist.index:
+                        all_hist[ticker] = pd.concat([hist, today_df.tail(1)])
+                    else:
+                        all_hist[ticker].loc[last_today] = today_df.loc[last_today]
+                except Exception as e:
+                    logger.debug(f"Today patch error {ticker}: {e}")
+        except Exception as e:
+            logger.warning(f"Today batch download error: {e}")
+
     # ── Step 3: Score all tickers ────────────────────────────────────────
     logger.info(f"Scoring {len(all_hist)} tickers with data...")
 
