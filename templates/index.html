@@ -384,6 +384,24 @@
       font-size: 0.82rem;
       color: var(--text-muted);
     }
+    .ticker-search {
+      width: 110px;
+      padding: 0.35rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      background: var(--surface);
+      color: var(--text);
+      text-transform: uppercase;
+    }
+    .ticker-search::placeholder { text-transform: none; }
+    .ticker-search:focus { outline: 2px solid #c05621; border-color: transparent; }
+    .filter-divider {
+      width: 1px;
+      height: 20px;
+      background: var(--border);
+      margin: 0 0.2rem;
+    }
 
     /* ── Empty state ───────────────────────────────────────────────────── */
     .empty-state {
@@ -741,6 +759,9 @@
 
   <!-- Score filter -->
   <div class="filter-bar" id="filterBar">
+    <span class="filter-label">Hisse Ara:</span>
+    <input class="ticker-search" id="tickerSearch" type="text" placeholder="Ticker..." oninput="applyFilter()">
+    <div class="filter-divider"></div>
     <span class="filter-label">Puan Aralığı:</span>
     <input class="filter-input" id="filterMin" type="number" min="0" step="0.1" placeholder="Min" oninput="applyFilter()">
     <span class="filter-label">—</span>
@@ -1055,13 +1076,25 @@
   function applyFilter() {
     const minVal = parseFloat(document.getElementById('filterMin').value);
     const maxVal = parseFloat(document.getElementById('filterMax').value);
-    const filtered = allResults.filter(r => {
+    const query = document.getElementById('tickerSearch').value.trim().toUpperCase();
+
+    let filtered = allResults.filter(r => {
       if (!isNaN(minVal) && r.score < minVal) return false;
       if (!isNaN(maxVal) && r.score > maxVal) return false;
+      if (query && !r.ticker.includes(query)) return false;
       return true;
     });
+
+    if (query) {
+      filtered.sort((a, b) => {
+        const aStarts = a.ticker.startsWith(query) ? 0 : 1;
+        const bStarts = b.ticker.startsWith(query) ? 0 : 1;
+        return aStarts - bStarts || a.ticker.localeCompare(b.ticker);
+      });
+    }
+
     const countEl = document.getElementById('filterCount');
-    const isFiltered = !isNaN(minVal) || !isNaN(maxVal);
+    const isFiltered = !isNaN(minVal) || !isNaN(maxVal) || query;
     countEl.textContent = isFiltered ? `${filtered.length} / ${allResults.length} hisse` : '';
     renderCards(filtered);
     renderTable(filtered);
@@ -1070,6 +1103,7 @@
   function resetFilter() {
     document.getElementById('filterMin').value = '';
     document.getElementById('filterMax').value = '';
+    document.getElementById('tickerSearch').value = '';
     document.getElementById('filterCount').textContent = '';
     renderCards(allResults);
     renderTable(allResults);
