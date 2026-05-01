@@ -396,6 +396,33 @@
     }
     .ticker-search::placeholder { text-transform: none; }
     .ticker-search:focus { outline: 2px solid #c05621; border-color: transparent; }
+    .filter-full-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      padding-top: 0.4rem;
+      border-top: 1px solid var(--border);
+    }
+    .sig-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+    .sig-chip {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 50px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    .sig-chip:hover { border-color: #c05621; color: #c05621; }
+    .sig-chip.active { background: #c05621; border-color: #c05621; color: #fff; }
     .filter-divider {
       width: 1px;
       height: 20px;
@@ -510,11 +537,12 @@
       padding: 0.7rem 0.85rem;
       border-left: 3px solid var(--border);
     }
-    .guide-card.domain-momentum { border-color: #c05621; }
-    .guide-card.domain-volume   { border-color: #2b6cb0; }
-    .guide-card.domain-rs       { border-color: #276749; }
-    .guide-card.domain-structure{ border-color: #553c9a; }
+    .guide-card.domain-momentum  { border-color: #c05621; }
+    .guide-card.domain-volume    { border-color: #2b6cb0; }
+    .guide-card.domain-rs        { border-color: #276749; }
+    .guide-card.domain-structure { border-color: #553c9a; }
     .guide-card.domain-volatility{ border-color: #b7791f; }
+    .guide-card.domain-oscillator{ border-color: #0987a0; }
 
     .guide-card-name {
       font-weight: 700;
@@ -768,6 +796,22 @@
     <input class="filter-input" id="filterMax" type="number" min="0" step="0.1" placeholder="Max" oninput="applyFilter()">
     <button class="filter-reset" onclick="resetFilter()">Temizle</button>
     <span class="filter-count" id="filterCount"></span>
+    <div class="filter-full-row">
+      <span class="filter-label">Sinyal:</span>
+      <div class="sig-chips" id="sigChips">
+        <button class="sig-chip" data-sig="Güçlü Momentum" onclick="toggleSigChip(this)">Güçlü Momentum</button>
+        <button class="sig-chip" data-sig="Boşluk Yukarı" onclick="toggleSigChip(this)">Boşluk Yukarı</button>
+        <button class="sig-chip" data-sig="Yüksek Hacim" onclick="toggleSigChip(this)">Yüksek Hacim</button>
+        <button class="sig-chip" data-sig="Artan Hacim" onclick="toggleSigChip(this)">Artan Hacim</button>
+        <button class="sig-chip" data-sig="Güçlü RS" onclick="toggleSigChip(this)">Güçlü RS</button>
+        <button class="sig-chip" data-sig="Pozitif RS" onclick="toggleSigChip(this)">Pozitif RS</button>
+        <button class="sig-chip" data-sig="EMA20 Üstü" onclick="toggleSigChip(this)">EMA20 Üstü</button>
+        <button class="sig-chip" data-sig="EMA50 Üstü" onclick="toggleSigChip(this)">EMA50 Üstü</button>
+        <button class="sig-chip" data-sig="52H Yakını" onclick="toggleSigChip(this)">52H Yakını</button>
+        <button class="sig-chip" data-sig="Yüksek ADR" onclick="toggleSigChip(this)">Yüksek ADR</button>
+        <button class="sig-chip" data-sig="RSI Aşırı Satım" onclick="toggleSigChip(this)">RSI Aşırı Satım</button>
+      </div>
+    </div>
   </div>
 
   <!-- Results: Mobile cards -->
@@ -864,6 +908,13 @@
         <div class="guide-card-domain">Volatilite</div>
         <div class="guide-card-desc">Son 20 günün ortalama günlük fiyat aralığı (Gün İçi Yüksek−Düşük), kapanışa oranla %3'ün üzerinde. Hisse çok geniş salınımlar yapıyor — hem fırsat hem risk demektir.</div>
         <div class="guide-card-weight">Ağırlık: 1.0</div>
+      </div>
+
+      <div class="guide-card domain-oscillator">
+        <div class="guide-card-name">RSI Aşırı Satım (RSI Oversold ≤ 30)</div>
+        <div class="guide-card-domain">Osilatör</div>
+        <div class="guide-card-desc">14 günlük RSI 30 veya altında. Hisse teknik olarak aşırı satım bölgesinde; potansiyel bir geri dönüş fırsatına işaret eder. Diğer sinyallerle birleştiğinde güçlü bir kontrarian sinyali oluşturur.</div>
+        <div class="guide-card-weight">Ağırlık: 1.5</div>
       </div>
 
     </div>
@@ -1073,15 +1124,22 @@
     `;
   }
 
+  function toggleSigChip(el) {
+    el.classList.toggle('active');
+    applyFilter();
+  }
+
   function applyFilter() {
     const minVal = parseFloat(document.getElementById('filterMin').value);
     const maxVal = parseFloat(document.getElementById('filterMax').value);
     const query = document.getElementById('tickerSearch').value.trim().toUpperCase();
+    const activeChips = [...document.querySelectorAll('.sig-chip.active')].map(el => el.dataset.sig);
 
     let filtered = allResults.filter(r => {
       if (!isNaN(minVal) && r.score < minVal) return false;
       if (!isNaN(maxVal) && r.score > maxVal) return false;
       if (query && !r.ticker.includes(query)) return false;
+      if (activeChips.length > 0 && !activeChips.every(sig => r.signals && r.signals.includes(sig))) return false;
       return true;
     });
 
@@ -1094,7 +1152,7 @@
     }
 
     const countEl = document.getElementById('filterCount');
-    const isFiltered = !isNaN(minVal) || !isNaN(maxVal) || query;
+    const isFiltered = !isNaN(minVal) || !isNaN(maxVal) || query || activeChips.length > 0;
     countEl.textContent = isFiltered ? `${filtered.length} / ${allResults.length} hisse` : '';
     renderCards(filtered);
     renderTable(filtered);
@@ -1105,6 +1163,7 @@
     document.getElementById('filterMax').value = '';
     document.getElementById('tickerSearch').value = '';
     document.getElementById('filterCount').textContent = '';
+    document.querySelectorAll('.sig-chip.active').forEach(el => el.classList.remove('active'));
     renderCards(allResults);
     renderTable(allResults);
   }

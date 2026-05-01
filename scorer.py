@@ -25,6 +25,7 @@ SIGNALS = {
     "above_ema50":      {"weight": 1.5, "domain": "Structure",      "label": "EMA50 Üstü"},
     "near_52w_high":    {"weight": 1.5, "domain": "Structure",      "label": "52H Yakını"},
     "adr_high":         {"weight": 1.0, "domain": "Volatility",     "label": "Yüksek ADR"},
+    "rsi_oversold":     {"weight": 1.5, "domain": "Oscillator",     "label": "RSI Aşırı Satım"},
 }
 
 DOMAIN_DIVERSITY_MULTIPLIER = 1.2
@@ -112,6 +113,22 @@ def _compute_ema(series: pd.Series, span: int) -> pd.Series:
     return series.ewm(span=span, adjust=False).mean()
 
 
+def _compute_rsi(series: pd.Series, period: int = 14) -> float:
+    """RSI using Wilder's exponential smoothing. Returns NaN if insufficient data."""
+    if series is None or len(series) < period + 1:
+        return float("nan")
+    delta = series.diff(1).dropna()
+    gain = delta.clip(lower=0)
+    loss = (-delta).clip(lower=0)
+    avg_gain = gain.ewm(alpha=1 / period, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1 / period, adjust=False).mean()
+    last_loss = avg_loss.iloc[-1]
+    if last_loss == 0:
+        return 100.0
+    rs = avg_gain.iloc[-1] / last_loss
+    return round(100 - (100 / (1 + rs)), 2)
+
+
 def _score_stock(ticker: str, hist: pd.DataFrame, index_change: float) -> StockResult:
     """Compute all signals and conviction score for a single stock."""
     result = StockResult(ticker=ticker)
@@ -191,6 +208,11 @@ def _score_stock(ticker: str, hist: pd.DataFrame, index_change: float) -> StockR
         # ADR
         if adr >= 3.0:
             active.append("adr_high")
+
+        # RSI oversold
+        rsi = _compute_rsi(closes)
+        if np.isfinite(rsi) and rsi <= 30.0:
+            active.append("rsi_oversold")
 
         # ── Score calculation ────────────────────────────────────────────
         domains_hit = set()
