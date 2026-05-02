@@ -172,7 +172,7 @@ templates.env.globals["enumerate"] = enumerate
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html", {})
 
 
 @app.post("/api/scan")
@@ -223,8 +223,7 @@ async def refresh_tickers():
 
 @app.get("/analyze/{ticker}", response_class=HTMLResponse)
 async def analyze_page(request: Request, ticker: str):
-    return templates.TemplateResponse("analysis.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "analysis.html", {
         "ticker": ticker.upper(),
     })
 
@@ -315,8 +314,7 @@ async def api_analyze(ticker: str):
 @app.get("/backtest", response_class=HTMLResponse)
 async def backtest_page(request: Request):
     runs = list_backtest_results(limit=10)
-    return templates.TemplateResponse("backtest.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "backtest.html", {
         "recent_runs": runs,
     })
 
@@ -377,8 +375,7 @@ async def backtest_result_page(request: Request, result_id: int):
     data = get_backtest_result(result_id)
     if not data:
         raise HTTPException(status_code=404, detail="Backtest sonucu bulunamadı")
-    return templates.TemplateResponse("backtest_results.html", {
-        "request":   request,
+    return templates.TemplateResponse(request, "backtest_results.html", {
         "result_id": result_id,
         "data":      data,
     })
