@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}Backtest — BIST Tarayıcı v2{% endblock %}
+{% block nav_backtest %}active{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1 style="font-size:1.4rem;font-weight:800;margin-bottom:1.25rem">📊 Backtest — VWAP Stop Stratejisi</h1>
+
+  <div style="display:grid;grid-template-columns:340px 1fr;gap:1.25rem;align-items:start">
+
+    <!-- Config form -->
+    <div class="card">
+      <div class="section-title" style="margin-bottom:0.9rem">Strateji Ayarları</div>
+      <div class="backtest-form">
+
+        <div class="form-group">
+          <label class="form-label">Hisse Sembolü</label>
+          <input class="form-input" id="btTicker" type="text" placeholder="Örn: THYAO" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Strateji</label>
+          <select class="form-select" id="btStrategy">
+            <option value="vwap_stop">VWAP Stop (Zarattini/Aziz)</option>
+            <option value="atr_1x">ATR×1 Stop</option>
+            <option value="atr_1_5x">ATR×1.5 Stop</option>
+            <option value="fixed_2pct">Sabit %2 Stop</option>
+          </select>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:0.5rem">
+          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.88rem;cursor:pointer">
+            <input type="checkbox" id="btMultiStop" checked style="accent-color:var(--accent)">
+            Çoklu stop karşılaştırması çalıştır
+          </label>
+          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.88rem;cursor:pointer">
+            <input type="checkbox" id="btSweep" style="accent-color:var(--accent)">
+            Filtre duyarlılık taraması çalıştır
+          </label>
+        </div>
+
+        <button class="btn btn-primary" id="btRunBtn" onclick="runBacktest()" style="width:100%">▶ Backtesti Çalıştır</button>
+        <div id="btStatus" style="display:none" class="status-bar"><div class="spinner"></div><span>Hesaplanıyor...</span></div>
+        <div id="btError" class="error-box" style="display:none"></div>
+      </div>
+
+      <!-- Strategy library -->
+      <div style="margin-top:1.5rem">
+        <div class="section-title" style="margin-bottom:0.6rem">Strateji Kütüphanesi</div>
+        <div style="display:flex;flex-direction:column;gap:0.5rem">
+          <div class="strategy-lib-item" onclick="selectStrategy('vwap_stop')">
+            <div style="font-weight:700;font-size:0.9rem">VWAP Stop (Zarattini/Aziz)</div>
+            <div style="font-size:0.78rem;color:var(--text-muted)">Gap≥2% + RVOL≥2x giriş. Fiyat VWAP altına düşünce çık.</div>
+          </div>
+          <div class="strategy-lib-item" onclick="selectStrategy('atr_1x')">
+            <div style="font-weight:700;font-size:0.9rem">ATR×1 Stop</div>
+            <div style="font-size:0.78rem;color:var(--text-muted)">Giriş−ATR×1 stop. Sıkı risk kontrolü.</div>
+          </div>
+          <div class="strategy-lib-item" onclick="selectStrategy('atr_1_5x')">
+            <div style="font-weight:700;font-size:0.9rem">ATR×1.5 Stop</div>
+            <div style="font-size:0.78rem;color:var(--text-muted)">Biraz daha geniş stop, daha az erken çıkış.</div>
+          </div>
+          <div class="strategy-lib-item" onclick="selectStrategy('fixed_2pct')">
+            <div style="font-weight:700;font-size:0.9rem">Sabit %2 Stop</div>
+            <div style="font-size:0.78rem;color:var(--text-muted)">Giriş fiyatının %2 altında sabit stop.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results preview -->
+    <div>
+      <div id="btResults" style="display:none">
+        <!-- Metrics -->
+        <div class="metrics-grid" id="btMetricsGrid" style="margin-bottom:1.25rem"></div>
+
+        <!-- Comparison table -->
+        <div id="btComparisonSection" style="display:none;margin-bottom:1.25rem">
+          <h3 style="font-size:0.95rem;font-weight:700;margin-bottom:0.75rem">Çoklu Stop Karşılaştırması</h3>
+          <div style="overflow-x:auto">
+            <table class="comparison-table" id="btComparisonTable">
+              <thead><tr>
+                <th>Strateji</th><th>İşlem</th><th>Kazanma%</th><th>Ort.Getiri%</th>
+                <th>Kar Faktörü</th><th>Sharpe</th><th>Max DD%</th>
+              </tr></thead>
+              <tbody id="btComparisonBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Sweep results -->
+        <div id="btSweepSection" style="display:none;margin-bottom:1.25rem">
+          <h3 style="font-size:0.95rem;font-weight:700;margin-bottom:0.75rem">Filtre Duyarlılık Taraması</h3>
+          <div style="overflow-x:auto">
+            <table class="comparison-table">
+              <thead><tr><th>Filtre</th><th>İşlem</th><th>Kazanma%</th><th>Ort.Getiri%</th><th>Kar Faktörü</th></tr></thead>
+              <tbody id="btSweepBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Trade log -->
+        <div>
+          <h3 style="font-size:0.95rem;font-weight:700;margin-bottom:0.75rem">İşlem Günlüğü <span id="btTradeCountLabel" style="font-size:0.82rem;color:var(--text-muted)"></span></h3>
+          <div style="overflow-x:auto">
+            <table class="data-table" id="btTradeTable">
+              <thead><tr>
+                <th>Giriş Tarihi</th><th>Çıkış Tarihi</th><th>Giriş</th><th>Çıkış</th>
+                <th>Getiri%</th><th>Gün</th><th>Çıkış Nedeni</th><th>MAE%</th><th>MFE%</th>
+              </tr></thead>
+              <tbody id="btTradeBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="btEmpty" style="text-align:center;padding:3rem;color:var(--text-muted)">
+        <div style="font-size:2.5rem;margin-bottom:0.75rem">📈</div>
+        <p>Soldaki formu doldurun ve backtesti çalıştırın.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Previous runs -->
+  {% if recent_runs %}
+  <div style="margin-top:2rem">
+    <h2 style="font-size:1rem;font-weight:700;margin-bottom:0.75rem">Son Backtest Çalışmaları</h2>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr><th>ID</th><th>Tarih</th><th>Hisse</th><th>Strateji</th><th>İşlem</th><th>Kazanma%</th><th>Ort.Getiri%</th><th></th></tr></thead>
+        <tbody>
+          {% for run in recent_runs %}
+          <tr>
+            <td style="color:var(--text-muted)">#{{ run.id }}</td>
+            <td style="font-size:0.82rem;color:var(--text-muted)">{{ run.run_at[:16] }}</td>
+            <td><strong>{{ run.config.ticker.replace('.IS','') }}</strong></td>
+            <td style="font-size:0.82rem">{{ run.config.strategy }}</td>
+            <td>{{ run.metrics.total_trades }}</td>
+            <td class="{{ 'pos' if run.metrics.win_rate > 50 else 'neg' }}">{{ run.metrics.win_rate }}%</td>
+            <td class="{{ 'pos' if run.metrics.avg_return > 0 else 'neg' }}">{{ run.metrics.avg_return }}%</td>
+            <td><a href="/backtest/result/{{ run.id }}" class="btn btn-ghost btn-sm">Detay</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.strategy-lib-item {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 0.65rem 0.8rem; cursor: pointer; transition: border-color 0.15s;
+}
+.strategy-lib-item:hover { border-color: var(--accent); }
+</style>
+<script>
+function selectStrategy(key) {
+  document.getElementById('btStrategy').value = key;
+}
+
+async function runBacktest() {
+  const ticker   = document.getElementById('btTicker').value.trim().toUpperCase();
+  const strategy = document.getElementById('btStrategy').value;
+  const multiStop = document.getElementById('btMultiStop').checked;
+  const runSweep  = document.getElementById('btSweep').checked;
+
+  if (!ticker) { alert('Hisse sembolü girin.'); return; }
+
+  const btn = document.getElementById('btRunBtn');
+  btn.disabled = true;
+  document.getElementById('btStatus').style.display = 'flex';
+  document.getElementById('btError').style.display  = 'none';
+  document.getElementById('btResults').style.display = 'none';
+  document.getElementById('btEmpty').style.display   = 'none';
+
+  try {
+    const res  = await fetch('/api/backtest/run', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ticker, strategy, multi_stop: multiStop, run_sweep: runSweep}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Backtest hatası');
+    renderBacktestResults(data, ticker);
+  } catch(e) {
+    const err = document.getElementById('btError');
+    err.textContent = '⚠️ ' + e.message;
+    err.style.display = 'block';
+    document.getElementById('btEmpty').style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    document.getElementById('btStatus').style.display = 'none';
+  }
+}
+
+function metricCard(label, value, cls) {
+  return `<div class="metric-card">
+    <div class="metric-label">${label}</div>
+    <div class="metric-value ${cls||'neutral'}">${value}</div>
+  </div>`;
+}
+
+function renderBacktestResults(data, ticker) {
+  document.getElementById('btResults').style.display = 'block';
+  const m = data.metrics;
+
+  document.getElementById('btMetricsGrid').innerHTML =
+    metricCard('Toplam İşlem', m.total_trades, 'neutral') +
+    metricCard('Kazanma Oranı', m.win_rate + '%', m.win_rate>50?'pos':'neg') +
+    metricCard('Ort. Getiri', m.avg_return + '%', m.avg_return>0?'pos':'neg') +
+    metricCard('Kar Faktörü', m.profit_factor, m.profit_factor>1?'pos':'neg') +
+    metricCard('Sharpe', m.sharpe, m.sharpe>0.5?'pos':m.sharpe<0?'neg':'neutral') +
+    metricCard('Max Drawdown', m.max_drawdown + '%', 'neg') +
+    metricCard('Beklenti', m.expectancy + '%', m.expectancy>0?'pos':'neg') +
+    metricCard('Toplam Getiri', m.total_return + '%', m.total_return>0?'pos':'neg');
+
+  // Comparison
+  if (data.comparison) {
+    const compBody = document.getElementById('btComparisonBody');
+    compBody.innerHTML = Object.entries(data.comparison).map(([k,v]) => {
+      const cm = v.metrics;
+      return `<tr>
+        <td style="font-weight:600">${v.name}</td>
+        <td>${cm.total_trades}</td>
+        <td class="${cm.win_rate>50?'pos':'neg'}">${cm.win_rate}%</td>
+        <td class="${cm.avg_return>0?'pos':'neg'}">${cm.avg_return}%</td>
+        <td class="${cm.profit_factor>1?'pos':'neg'}">${cm.profit_factor}</td>
+        <td class="${cm.sharpe>0.5?'pos':cm.sharpe<0?'neg':''}">${cm.sharpe}</td>
+        <td class="neg">${cm.max_drawdown}%</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('btComparisonSection').style.display = 'block';
+  }
+
+  // Sweep
+  if (data.sweep) {
+    const swBody = document.getElementById('btSweepBody');
+    swBody.innerHTML = Object.entries(data.sweep).map(([name,v]) => {
+      const sm = v.metrics;
+      return `<tr>
+        <td style="font-weight:600">${name}</td>
+        <td>${sm.total_trades}</td>
+        <td class="${sm.win_rate>50?'pos':'neg'}">${sm.win_rate}%</td>
+        <td class="${sm.avg_return>0?'pos':'neg'}">${sm.avg_return}%</td>
+        <td class="${sm.profit_factor>1?'pos':'neg'}">${sm.profit_factor}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('btSweepSection').style.display = 'block';
+  }
+
+  // Trades
+  const trades = data.trades || [];
+  document.getElementById('btTradeCountLabel').textContent = `(${data.trade_count || trades.length} işlem${data.trade_count > trades.length ? ', ilk 50 gösteriliyor' : ''})`;
+  document.getElementById('btTradeBody').innerHTML = trades.map(t => `
+    <tr>
+      <td style="font-family:'Space Mono',monospace;font-size:0.82rem">${t.entry_date}</td>
+      <td style="font-family:'Space Mono',monospace;font-size:0.82rem">${t.exit_date}</td>
+      <td style="font-family:'Space Mono',monospace">${t.entry_price.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td style="font-family:'Space Mono',monospace">${t.exit_price.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td class="${t.return_pct>0?'pos':'neg'}" style="font-weight:700">${t.return_pct>0?'+':''}${t.return_pct}%</td>
+      <td>${t.hold_days}</td>
+      <td style="font-size:0.8rem;color:var(--text-muted)">${t.exit_reason==='stop'?'⛔ Stop':'⏱ Süre'}</td>
+      <td class="neg" style="font-size:0.82rem">${t.mae}%</td>
+      <td class="pos" style="font-size:0.82rem">${t.mfe}%</td>
+    </tr>
+  `).join('');
+}
+</script>
+{% endblock %}

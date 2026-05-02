@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+{% block title %}{{ ticker }} — Analiz — BIST Tarayıcı v2{% endblock %}
+{% block nav_home %}active{% endblock %}
+
+{% block head_extra %}
+<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;flex-wrap:wrap">
+    <a href="/" class="btn btn-ghost btn-sm">← Geri</a>
+    <h1 style="font-size:1.6rem;font-weight:900;font-family:'Space Mono',monospace" id="pageTitle">{{ ticker }}</h1>
+    <span id="pageTier"></span>
+    <span id="pageTierLabel" style="font-size:0.9rem;color:var(--text-muted)"></span>
+    <div style="margin-left:auto;display:flex;gap:0.5rem">
+      <a id="backtestLink" href="/backtest" class="btn btn-ghost btn-sm">📊 Backtest</a>
+    </div>
+  </div>
+
+  <div id="loadingState" style="text-align:center;padding:3rem;color:var(--text-muted)">
+    <div class="spinner" style="margin:0 auto 1rem"></div>
+    <p>Analiz yükleniyor...</p>
+  </div>
+
+  <div id="errorState" class="error-box" style="display:none"></div>
+
+  <div id="analysisContent" style="display:none">
+    <!-- Main grid: chart + sidebar -->
+    <div class="analysis-grid">
+      <!-- Left: chart -->
+      <div>
+        <div class="chart-box" id="chartContainer" style="height:400px"></div>
+        <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.5rem;font-size:0.78rem;color:var(--text-muted)">
+          <span><span style="display:inline-block;width:12px;height:3px;background:#60a5fa;vertical-align:middle;margin-right:3px"></span>VWAP (20g)</span>
+          <span><span style="display:inline-block;width:12px;height:3px;background:rgba(96,165,250,0.4);vertical-align:middle;margin-right:3px"></span>VWAP ±1σ</span>
+        </div>
+      </div>
+
+      <!-- Right: scores + signal -->
+      <div style="display:flex;flex-direction:column;gap:1rem">
+        <!-- Composite score -->
+        <div class="card">
+          <div class="section-title" style="margin-bottom:0.75rem">Kompozit Puan</div>
+          <div style="display:flex;align-items:baseline;gap:0.75rem;margin-bottom:1rem">
+            <span class="score-big" id="compositeScore">-</span>
+            <span style="font-size:1rem;color:var(--text-muted)">/100</span>
+          </div>
+          <div class="score-sets" id="scoreSets"></div>
+        </div>
+
+        <!-- Trade signal -->
+        <div class="card" id="signalCard">
+          <div class="section-title" style="margin-bottom:0.6rem">Sinyal</div>
+          <div id="signalDirection" style="font-size:1.2rem;font-weight:800;margin-bottom:0.75rem"></div>
+          <div class="levels-grid" id="signalLevels"></div>
+          <div id="signalNotes" style="font-size:0.82rem;color:var(--text-muted);line-height:1.6;margin-top:0.5rem"></div>
+        </div>
+
+        <!-- VWAP info -->
+        <div class="card" id="vwapCard">
+          <div class="section-title" style="margin-bottom:0.5rem">VWAP (20 Günlük)</div>
+          <div id="vwapInfo" style="font-size:0.88rem;line-height:1.8"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Details row -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;margin-top:1.25rem">
+      <!-- Regime -->
+      <div class="card">
+        <div class="section-title" style="color:var(--regime-col);margin-bottom:0.6rem">Piyasa Rejimi (XU100)</div>
+        <div id="regimeDetails"></div>
+      </div>
+      <!-- Momentum -->
+      <div class="card">
+        <div class="section-title" style="color:var(--momentum-col);margin-bottom:0.6rem">Momentum</div>
+        <div id="momentumDetails"></div>
+      </div>
+      <!-- Structure -->
+      <div class="card">
+        <div class="section-title" style="color:var(--structure-col);margin-bottom:0.6rem">Yapı</div>
+        <div id="structureDetails"></div>
+      </div>
+    </div>
+
+    <!-- Reasoning -->
+    <div class="card" style="margin-top:1rem">
+      <div class="section-title" style="margin-bottom:0.5rem">✨ Değerlendirme</div>
+      <div id="reasoningText" style="font-size:0.9rem;line-height:1.7;color:var(--text)"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TICKER = '{{ ticker }}';
+
+const FIVE_SETS = [
+  {key:'regime',     label:'Piyasa Rejimi', cls:'bar-regime',     wt:20},
+  {key:'momentum',   label:'Momentum',      cls:'bar-momentum',   wt:20},
+  {key:'structure',  label:'Yapı',          cls:'bar-structure',  wt:30},
+  {key:'smart_money',label:'Akıllı Para',   cls:'bar-smartmoney', wt:15},
+  {key:'catalyst',   label:'Katalizör',     cls:'bar-catalyst',   wt:15},
+];
+
+function fmtPrice(v) { return v != null ? v.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '-'; }
+
+function kv(label, value, color) {
+  return `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)">
+    <span style="color:var(--text-muted);font-size:0.82rem">${label}</span>
+    <span style="font-weight:600;font-size:0.82rem;${color?'color:'+color:''}">${value}</span>
+  </div>`;
+}
+
+async function loadAnalysis() {
+  try {
+    const res  = await fetch(`/api/analyze/${TICKER}`);
+    if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Analiz hatası'); }
+    const data = await res.json();
+    renderAnalysis(data);
+  } catch(e) {
+    document.getElementById('loadingState').style.display = 'none';
+    const err = document.getElementById('errorState');
+    err.textContent = '⚠️ ' + e.message;
+    err.style.display = 'block';
+  }
+}
+
+function renderAnalysis(d) {
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('analysisContent').style.display = 'block';
+
+  const bd = d.breakdown;
+  const tier = d.tier;
+
+  // Title
+  document.getElementById('pageTier').innerHTML = `<span class="tier-badge tier-${tier}">${tier}</span>`;
+  document.getElementById('pageTierLabel').textContent = `${d.composite.toFixed(1)}/100`;
+
+  // Composite score
+  const scoreEl = document.getElementById('compositeScore');
+  scoreEl.textContent = d.composite.toFixed(1);
+  scoreEl.className = `score-big tier-${tier}`;
+
+  // Five-set bars
+  const scoreMap = {
+    regime: d.breakdown.sets.find(s=>s.label.includes('Rejim'))?.raw_score || 0,
+    momentum: d.breakdown.sets.find(s=>s.label.includes('Mom'))?.raw_score || 0,
+    structure: d.breakdown.sets.find(s=>s.label.includes('Yapı'))?.raw_score || 0,
+    smart_money: d.breakdown.sets.find(s=>s.label.includes('Akıllı'))?.raw_score || 0,
+    catalyst: d.breakdown.sets.find(s=>s.label.includes('Kata'))?.raw_score || 0,
+  };
+  document.getElementById('scoreSets').innerHTML = FIVE_SETS.map(s => `
+    <div class="score-set-row">
+      <span class="score-set-label">${s.label} <span style="font-size:0.65rem;color:var(--text-muted)">(${s.wt}%)</span></span>
+      <div class="score-set-bar-wrap">
+        <div class="score-set-bar ${s.cls}" style="width:${scoreMap[s.key]||0}%"></div>
+      </div>
+      <span class="score-set-val">${(scoreMap[s.key]||0).toFixed(0)}</span>
+    </div>
+  `).join('');
+
+  // Signal
+  const sig = d.signal;
+  const dirEl = document.getElementById('signalDirection');
+  if (sig.direction === 'LONG') {
+    dirEl.innerHTML = '<span style="color:#4ade80">▲ LONG</span>';
+  } else if (sig.direction === 'SHORT') {
+    dirEl.innerHTML = '<span style="color:#f87171">▼ SHORT</span>';
+  } else {
+    dirEl.innerHTML = `<span style="color:var(--text-muted)">⛔ BLOCKED — ${sig.blocked_reason||''}</span>`;
+  }
+
+  if (sig.direction !== 'BLOCKED' && sig.entry) {
+    const risk = sig.entry - sig.stop_primary;
+    const riskPct = risk > 0 ? (risk/sig.entry*100).toFixed(1) : '?';
+    const tp1Pct  = sig.tp1 ? ((sig.tp1-sig.entry)/sig.entry*100).toFixed(1) : '?';
+    const tp2Pct  = sig.tp2 ? ((sig.tp2-sig.entry)/sig.entry*100).toFixed(1) : '?';
+    document.getElementById('signalLevels').innerHTML = `
+      <div class="level-card sl"><div class="level-label">Stop</div><div class="level-price">${fmtPrice(sig.stop_primary)} ₺</div><div class="level-pct">−${riskPct}%</div></div>
+      <div class="level-card tp1"><div class="level-label">TP 1</div><div class="level-price">${fmtPrice(sig.tp1)} ₺</div><div class="level-pct">+${tp1Pct}%</div></div>
+      <div class="level-card tp2"><div class="level-label">TP 2</div><div class="level-price">${fmtPrice(sig.tp2)} ₺</div><div class="level-pct">+${tp2Pct}%</div></div>
+    `;
+  } else {
+    document.getElementById('signalLevels').innerHTML = '';
+  }
+
+  if (sig.notes && sig.notes.length) {
+    document.getElementById('signalNotes').innerHTML = sig.notes.map(n => `<div>• ${n}</div>`).join('');
+  }
+
+  // VWAP
+  const vwap = d.vwap;
+  if (vwap && vwap.vwap) {
+    const aboveColor = vwap.above_vwap ? '#4ade80' : '#f87171';
+    document.getElementById('vwapInfo').innerHTML =
+      kv('VWAP (20g)', fmtPrice(vwap.vwap) + ' ₺', null) +
+      kv('Üst Bant +1σ', fmtPrice(vwap.upper1) + ' ₺', null) +
+      kv('Alt Bant −1σ', fmtPrice(vwap.lower1) + ' ₺', null) +
+      kv('Pozisyon', vwap.above_vwap ? 'VWAP Üstü' : 'VWAP Altı', aboveColor);
+  }
+
+  // Regime details
+  const reg = d.regime;
+  if (reg) {
+    const trendColor = {bullish:'#4ade80',neutral:'#fbbf24',bearish:'#f87171'}[reg.trend] || '';
+    document.getElementById('regimeDetails').innerHTML =
+      kv('Trend', reg.trend || '-', trendColor) +
+      (reg.xu100_price ? kv('XU100', fmtPrice(reg.xu100_price), null) : '') +
+      (reg.ema20 ? kv('EMA20', fmtPrice(reg.ema20), null) : '') +
+      (reg.ema50 ? kv('EMA50', fmtPrice(reg.ema50), null) : '') +
+      `<div style="margin-top:0.5rem;font-size:0.8rem;color:var(--text-muted)">${(reg.trend_signals||[]).join(' • ')}</div>`;
+  }
+
+  // Momentum details
+  const mom = d.momentum;
+  if (mom) {
+    document.getElementById('momentumDetails').innerHTML =
+      (mom.rsi != null ? kv('RSI (14)', mom.rsi.toFixed(1), mom.rsi>70?'#f87171':mom.rsi>50?'#4ade80':null) : '') +
+      (mom.rvol ? kv('RVOL', mom.rvol.toFixed(1) + 'x', mom.rvol>=2?'#4ade80':null) : '') +
+      (mom.adx != null ? kv('ADX', mom.adx.toFixed(1), mom.adx>=25?'#fbbf24':null) : '') +
+      (mom.ema8 ? kv('EMA8', fmtPrice(mom.ema8), null) : '') +
+      (mom.ema21 ? kv('EMA21', fmtPrice(mom.ema21), null) : '') +
+      `<div style="margin-top:0.5rem;font-size:0.78rem;color:var(--text-muted)">${(mom.signals||[]).slice(0,3).join(' • ')}</div>`;
+  }
+
+  // Structure details
+  const st = d.structure;
+  if (st) {
+    document.getElementById('structureDetails').innerHTML =
+      kv('Boşluk', (st.gap_pct>=0?'+':'') + st.gap_pct.toFixed(1) + '% (' + (st.gap_type||'flat') + ')', st.gap_pct>2?'#4ade80':st.gap_pct<-2?'#f87171':null) +
+      (st.ema50 ? kv('EMA50', fmtPrice(st.ema50), null) : '') +
+      (st.high_52w ? kv('52H Yük.', fmtPrice(st.high_52w), null) : '') +
+      kv('52H Uzaklık', (st.pct_from_52w_high||0).toFixed(1) + '%', st.pct_from_52w_high<5?'#4ade80':null) +
+      kv('ADR', (st.adr||0).toFixed(1) + '%', null) +
+      kv('ATR', fmtPrice(st.atr), null) +
+      kv('RS vs XU100', (st.rs_vs_xu100>=0?'+':'') + (st.rs_vs_xu100||0).toFixed(2) + '%', st.rs_vs_xu100>=1?'#4ade80':st.rs_vs_xu100<0?'#f87171':null);
+  }
+
+  // Reasoning
+  document.getElementById('reasoningText').textContent = d.reasoning || 'Analiz verisi mevcut değil.';
+
+  // Build Lightweight Chart
+  buildChart(d.candles, d.vwap);
+}
+
+function buildChart(candles, vwapData) {
+  const container = document.getElementById('chartContainer');
+  if (!candles || !candles.length) return;
+
+  const chart = LightweightCharts.createChart(container, {
+    width:  container.clientWidth,
+    height: 400,
+    layout: { background: {color:'#161b22'}, textColor: '#8b949e' },
+    grid:   { vertLines: {color:'#21262d'}, horzLines: {color:'#21262d'} },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    timeScale: { borderColor: '#30363d', timeVisible: true },
+  });
+
+  const candleSeries = chart.addCandlestickSeries({
+    upColor: '#4ade80', downColor: '#f87171',
+    borderUpColor: '#4ade80', borderDownColor: '#f87171',
+    wickUpColor: '#4ade80', wickDownColor: '#f87171',
+  });
+  candleSeries.setData(candles);
+
+  // VWAP line
+  if (vwapData && vwapData.series && vwapData.series.length) {
+    const vwapLine = chart.addLineSeries({ color: '#60a5fa', lineWidth: 2, title: 'VWAP' });
+    vwapLine.setData(vwapData.series);
+
+    // ±1σ bands
+    if (vwapData.upper1 && vwapData.lower1) {
+      const upper1 = chart.addLineSeries({ color: 'rgba(96,165,250,0.35)', lineWidth: 1, lineStyle: 2 });
+      const lower1 = chart.addLineSeries({ color: 'rgba(96,165,250,0.35)', lineWidth: 1, lineStyle: 2 });
+      // Use last date for static band display (simplified)
+      const lastTime = vwapData.series[vwapData.series.length - 1]?.time;
+      if (lastTime) {
+        // Show bands as horizontal price lines instead
+        candleSeries.createPriceLine({ price: vwapData.upper1, color: 'rgba(96,165,250,0.5)', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '+1σ' });
+        candleSeries.createPriceLine({ price: vwapData.lower1, color: 'rgba(96,165,250,0.5)', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '-1σ' });
+      }
+    }
+  }
+
+  chart.timeScale().fitContent();
+
+  // Responsive resize
+  const resizeObserver = new ResizeObserver(() => {
+    chart.resize(container.clientWidth, 400);
+  });
+  resizeObserver.observe(container);
+}
+
+loadAnalysis();
+</script>
+{% endblock %}

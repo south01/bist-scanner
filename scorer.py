@@ -1,6 +1,7 @@
 """
-scorer.py — Signal computation and conviction scoring for BIST stocks.
-All price data comes from yfinance (EOD/delayed). No fundamentals.
+scorer.py — Signal computation and conviction scoring for BIST stocks (v2.0).
+Five-set composite scoring: Regime, Momentum, Structure, Smart Money, Catalyst.
+All price data comes from yfinance (EOD/daily). No fundamentals.
 """
 
 import logging
@@ -11,48 +12,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Optional
 
+from indicators.scoring import compute_composite, generate_score_breakdown
+
 logger = logging.getLogger(__name__)
 
-# ── Signal weights ──────────────────────────────────────────────────────────
-SIGNALS = {
-    "gap_up_combo":     {"weight": 3.0, "domain": "Momentum",       "label": "Güçlü Momentum"},
-    "gap_up":           {"weight": 1.5, "domain": "Momentum",       "label": "Boşluk Yukarı"},
-    "rvol_3x":          {"weight": 2.0, "domain": "Volume",         "label": "Yüksek Hacim"},
-    "rvol_2x":          {"weight": 1.0, "domain": "Volume",         "label": "Artan Hacim"},
-    "rs_strong":        {"weight": 2.0, "domain": "Rel. Strength",  "label": "Güçlü RS"},
-    "rs_moderate":      {"weight": 1.0, "domain": "Rel. Strength",  "label": "Pozitif RS"},
-    "above_ema20":      {"weight": 1.0, "domain": "Structure",      "label": "EMA20 Üstü"},
-    "above_ema50":      {"weight": 1.5, "domain": "Structure",      "label": "EMA50 Üstü"},
-    "near_52w_high":    {"weight": 1.5, "domain": "Structure",      "label": "52H Yakını"},
-    "adr_high":         {"weight": 1.0, "domain": "Volatility",     "label": "Yüksek ADR"},
-    "rsi_oversold":     {"weight": 1.5, "domain": "Oscillator",     "label": "RSI Aşırı Satım"},
-}
-
-DOMAIN_DIVERSITY_MULTIPLIER = 1.2
-DOMAIN_DIVERSITY_MIN = 3
-
-# Tier thresholds
-TIERS = [
-    ("S", 8.0),
-    ("A", 5.0),
-    ("B", 3.0),
-    ("C", 1.0),
-]
-
-
-@dataclass
-class StockResult:
-    ticker: str
-    company_name: str = ""
-    price: float = 0.0
-    change_pct: float = 0.0
-    rvol: float = 0.0
-    score: float = 0.0
-    tier: str = "-"
-    active_signals: list = field(default_factory=list)
-    score_breakdown: dict = field(default_factory=dict)
-    adr: float = 0.0
-    error: Optional[str] = None
+# ── Tier thresholds (0–100 composite scale) ───────────────────────────────────
+TIERS = [("S", 70), ("A", 50), ("B", 35), ("C", 20)]
 
 
 def _compute_tier(score: float) -> str:
@@ -71,66 +36,59 @@ def _safe_float(val, default=0.0) -> float:
 
 
 def _compute_rvol(hist: pd.DataFrame, lookback: int = 20) -> float:
-    """
-    Relative volume: today's volume vs average of previous N days.
-    Uses the last row as 'today'.
-    """
     if hist is None or len(hist) < 5:
         return 0.0
     volumes = hist["Volume"].dropna()
     if len(volumes) < 2:
         return 0.0
     today_vol = _safe_float(volumes.iloc[-1])
-    avg_vol = _safe_float(volumes.iloc[-(lookback + 1):-1].mean())
-    if avg_vol <= 0:
-        return 0.0
-    return round(today_vol / avg_vol, 2)
+    avg_vol   = _safe_float(volumes.iloc[-(lookback + 1):-1].mean())
+    return round(today_vol / avg_vol, 2) if avg_vol > 0 else 0.0
 
 
 def _compute_adr(hist: pd.DataFrame, days: int = 20) -> float:
-    """Average Daily Range % over last N days."""
     if hist is None or len(hist) < 5:
         return 0.0
     recent = hist.tail(days)
-    highs = recent["High"].values
-    lows = recent["Low"].values
-    closes = recent["Close"].values
     ranges = []
-    for h, l, c in zip(highs, lows, closes):
+    for _, row in recent.iterrows():
+        c = row["Close"]
         if c > 0:
-            ranges.append((h - l) / c * 100)
-    if not ranges:
-        return 0.0
-    return round(float(np.mean(ranges)), 2)
+            ranges.append((row["High"] - row["Low"]) / c * 100)
+    return round(float(np.mean(ranges)), 2) if ranges else 0.0
 
 
-def _compute_rs(stock_change: float, index_change: float) -> float:
-    """Relative strength vs index."""
-    return round(stock_change - index_change, 2)
+@dataclass
+class StockResult:
+    ticker: str
+    company_name: str = ""
+    price: float = 0.0
+    change_pct: float = 0.0
+    rvol: float = 0.0
+    score: float = 0.0            # composite 0-100
+    tier: str = "-"
+    active_signals: list = field(default_factory=list)
+    score_breakdown: dict = field(default_factory=dict)
+    adr: float = 0.0
+    # v2.0 five-set scores
+    regime_score: float = 0.0
+    momentum_score: float = 0.0
+    structure_score: float = 0.0
+    smart_money_score: float = 0.0
+    catalyst_score: float = 0.0
+    reasoning: str = ""
+    vwap_data: dict = field(default_factory=dict)
+    structure_details: dict = field(default_factory=dict)
+    error: Optional[str] = None
 
 
-def _compute_ema(series: pd.Series, span: int) -> pd.Series:
-    return series.ewm(span=span, adjust=False).mean()
-
-
-def _compute_rsi(series: pd.Series, period: int = 14) -> float:
-    """RSI using Wilder's exponential smoothing. Returns NaN if insufficient data."""
-    if series is None or len(series) < period + 1:
-        return float("nan")
-    delta = series.diff(1).dropna()
-    gain = delta.clip(lower=0)
-    loss = (-delta).clip(lower=0)
-    avg_gain = gain.ewm(alpha=1 / period, adjust=False).mean()
-    avg_loss = loss.ewm(alpha=1 / period, adjust=False).mean()
-    last_loss = avg_loss.iloc[-1]
-    if last_loss == 0:
-        return 100.0
-    rs = avg_gain.iloc[-1] / last_loss
-    return round(100 - (100 / (1 + rs)), 2)
-
-
-def _score_stock(ticker: str, hist: pd.DataFrame, index_change: float) -> StockResult:
-    """Compute all signals and conviction score for a single stock."""
+def _score_stock(
+    ticker: str,
+    hist: pd.DataFrame,
+    xu100_hist: pd.DataFrame,
+    index_change: float,
+) -> StockResult:
+    """Compute five-set composite score for a single stock."""
     result = StockResult(ticker=ticker)
 
     try:
@@ -139,109 +97,43 @@ def _score_stock(ticker: str, hist: pd.DataFrame, index_change: float) -> StockR
             return result
 
         closes = hist["Close"].dropna()
-        if len(closes) < 2:
+        if len(closes) < 5:
             result.error = "Yeterli kapanış verisi yok"
             return result
 
-        price = _safe_float(closes.iloc[-1])
+        price      = _safe_float(closes.iloc[-1])
         prev_close = _safe_float(closes.iloc[-2])
         result.price = round(price, 2)
 
         if prev_close > 0:
             result.change_pct = round((price - prev_close) / prev_close * 100, 2)
 
-        # RVOL
         result.rvol = _compute_rvol(hist)
+        result.adr  = _compute_adr(hist)
 
-        # Gap up detection (change_pct as proxy for gap, using daily open if available)
-        gap_pct = result.change_pct  # fallback: use day change
-        if "Open" in hist.columns:
-            today_open = _safe_float(hist["Open"].iloc[-1])
-            if prev_close > 0 and today_open > 0:
-                gap_pct = (today_open - prev_close) / prev_close * 100
+        # ── Five-set composite ────────────────────────────────────────────
+        comp = compute_composite(
+            ticker=ticker,
+            hist=hist,
+            xu100_hist=xu100_hist,
+            index_change=index_change,
+        )
 
-        # RS vs XU100
-        rs = _compute_rs(result.change_pct, index_change)
-
-        # EMAs
-        ema20 = _compute_ema(closes, 20)
-        ema50 = _compute_ema(closes, 50) if len(closes) >= 50 else None
-
-        # 52-week high
-        high_52w = _safe_float(closes.tail(252).max())
-        near_52w = high_52w > 0 and price >= high_52w * 0.95
-
-        # ADR
-        adr = _compute_adr(hist)
-
-        # ── Active signals ───────────────────────────────────────────────
-        active = []
-        score = 0.0
-
-        # Gap+RVOL combo (highest weight — must satisfy both)
-        if gap_pct > 5.0 and result.rvol >= 3.0:
-            active.append("gap_up_combo")
-        else:
-            # Individual gap signal
-            if gap_pct > 3.0:
-                active.append("gap_up")
-            # Individual RVOL signals
-            if result.rvol >= 3.0:
-                active.append("rvol_3x")
-            elif result.rvol >= 2.0:
-                active.append("rvol_2x")
-
-        # RS
-        if rs >= 3.0:
-            active.append("rs_strong")
-        elif rs >= 1.0:
-            active.append("rs_moderate")
-
-        # Structure
-        if ema20 is not None and price > _safe_float(ema20.iloc[-1]):
-            active.append("above_ema20")
-        if ema50 is not None and price > _safe_float(ema50.iloc[-1]):
-            active.append("above_ema50")
-        if near_52w:
-            active.append("near_52w_high")
-
-        # ADR
-        if adr >= 3.0:
-            active.append("adr_high")
-
-        # RSI oversold
-        rsi = _compute_rsi(closes)
-        if np.isfinite(rsi) and rsi <= 30.0:
-            active.append("rsi_oversold")
-
-        # ── Score calculation ────────────────────────────────────────────
-        domains_hit = set()
-        for sig in active:
-            w = SIGNALS[sig]["weight"]
-            score += w
-            domains_hit.add(SIGNALS[sig]["domain"])
-
-        base_score = score
-        diversity_bonus = len(domains_hit) >= DOMAIN_DIVERSITY_MIN
-        if diversity_bonus:
-            score *= DOMAIN_DIVERSITY_MULTIPLIER
-
-        result.score = round(score, 2)
-        result.tier = _compute_tier(result.score)
-        result.adr = adr
-        result.active_signals = [SIGNALS[s]["label"] for s in active]
-        result.score_breakdown = {
-            "signals": [
-                {"label": SIGNALS[s]["label"], "weight": SIGNALS[s]["weight"]}
-                for s in active
-            ],
-            "base_score": round(base_score, 2),
-            "diversity_bonus": diversity_bonus,
-            "final_score": result.score,
-        }
+        result.score            = comp["score"]
+        result.tier             = comp["tier"]
+        result.regime_score     = comp["regime_score"]
+        result.momentum_score   = comp["momentum_score"]
+        result.structure_score  = comp["structure_score"]
+        result.smart_money_score = comp["smart_money_score"]
+        result.catalyst_score   = comp["catalyst_score"]
+        result.active_signals   = comp.get("active_signals", [])
+        result.reasoning        = comp.get("reasoning", "")
+        result.vwap_data        = comp.get("vwap_data", {})
+        result.structure_details = comp.get("structure_details", {})
+        result.score_breakdown  = generate_score_breakdown(comp)
 
     except Exception as e:
-        logger.warning(f"Score error for {ticker}: {e}")
+        logger.warning(f"Score error for {ticker}: {e}", exc_info=True)
         result.error = str(e)
 
     return result
@@ -253,10 +145,9 @@ def run_scan(
     max_workers: int = 10,
 ) -> list[StockResult]:
     """
-    Download data for all tickers and compute scores.
+    Download data for all tickers and compute five-set composite scores.
     Returns results sorted by score descending.
-    
-    progress_callback(done, total): called after each batch completes.
+    progress_callback(done, total): called after each batch download.
     """
     results = []
     total = len(tickers)
@@ -264,10 +155,13 @@ def run_scan(
     # ── Step 1: Fetch XU100 index data ──────────────────────────────────
     logger.info("Fetching XU100 index data...")
     index_change = 0.0
+    xu100_hist   = None
     try:
-        xu100 = yf.download("XU100.IS", period="5d", interval="1d", progress=False, auto_adjust=True)
-        if xu100 is not None and len(xu100) >= 2:
-            c = xu100["Close"].dropna()
+        xu100_hist = yf.download(
+            "XU100.IS", period="1y", interval="1d", progress=False, auto_adjust=True
+        )
+        if xu100_hist is not None and len(xu100_hist) >= 2:
+            c = xu100_hist["Close"].dropna()
             if len(c) >= 2:
                 index_change = float((c.iloc[-1] - c.iloc[-2]) / c.iloc[-2] * 100)
         logger.info(f"XU100 change: {index_change:.2f}%")
@@ -280,38 +174,29 @@ def run_scan(
     done_count = 0
 
     ticker_batches = [tickers[i:i + BATCH_SIZE] for i in range(0, total, BATCH_SIZE)]
-    logger.info(f"Downloading data for {total} tickers in {len(ticker_batches)} batches...")
+    logger.info(f"Downloading {total} tickers in {len(ticker_batches)} batches...")
 
     for batch_idx, batch in enumerate(ticker_batches):
         try:
             batch_str = " ".join(batch)
             raw = yf.download(
-                batch_str,
-                period="1y",
-                interval="1d",
-                progress=False,
-                auto_adjust=True,
-                group_by="ticker",
-                threads=True,
+                batch_str, period="1y", interval="1d",
+                progress=False, auto_adjust=True,
+                group_by="ticker", threads=True,
             )
-
             for ticker in batch:
                 try:
                     if len(batch) == 1:
-                        # Single ticker returns flat DataFrame
                         df = raw.copy() if not raw.empty else None
                     else:
-                        # Multi-ticker returns MultiIndex
                         if ticker in raw.columns.get_level_values(0):
                             df = raw[ticker].copy()
                         else:
                             df = None
                     if df is not None and not df.empty:
-                        df = df.dropna(how="all")
-                        all_hist[ticker] = df
+                        all_hist[ticker] = df.dropna(how="all")
                 except Exception as e:
                     logger.debug(f"Extract error {ticker}: {e}")
-
         except Exception as e:
             logger.warning(f"Batch {batch_idx} download error: {e}")
 
@@ -319,20 +204,16 @@ def run_scan(
         if progress_callback:
             progress_callback(done_count, total)
 
-    # ── Step 2b: Patch today's close (yfinance omits it in multi-day downloads) ──
-    logger.info("Patching today's prices with period=1d download...")
+    # ── Step 2b: Patch today's close ────────────────────────────────────
+    logger.info("Patching today's prices...")
     today_batches = [tickers[i:i + BATCH_SIZE] for i in range(0, total, BATCH_SIZE)]
     for batch in today_batches:
         try:
             batch_str = " ".join(batch)
             today_raw = yf.download(
-                batch_str,
-                period="1d",
-                interval="1d",
-                progress=False,
-                auto_adjust=True,
-                group_by="ticker",
-                threads=True,
+                batch_str, period="1d", interval="1d",
+                progress=False, auto_adjust=True,
+                group_by="ticker", threads=True,
             )
             if today_raw is None or today_raw.empty:
                 continue
@@ -361,29 +242,28 @@ def run_scan(
             logger.warning(f"Today batch download error: {e}")
 
     # ── Step 3: Score all tickers ────────────────────────────────────────
-    logger.info(f"Scoring {len(all_hist)} tickers with data...")
+    logger.info(f"Scoring {len(all_hist)} tickers...")
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(_score_stock, ticker, hist, index_change): ticker
+            executor.submit(_score_stock, ticker, hist, xu100_hist, index_change): ticker
             for ticker, hist in all_hist.items()
         }
         for future in as_completed(futures):
             try:
-                result = future.result()
-                results.append(result)
+                results.append(future.result())
             except Exception as e:
                 ticker = futures[future]
                 logger.warning(f"Score future error {ticker}: {e}")
                 results.append(StockResult(ticker=ticker, error=str(e)))
 
-    # Add tickers we couldn't fetch at all
+    # Add tickers we couldn't fetch
     fetched = set(all_hist.keys())
     for ticker in tickers:
         if ticker not in fetched:
             results.append(StockResult(ticker=ticker, error="Veri indirilemedi"))
 
-    # Sort: scored stocks first (by score desc), then errored ones
+    # Sort: scored first by score desc, then errored
     results.sort(key=lambda r: (r.error is None, r.score), reverse=True)
 
     scored = sum(1 for r in results if r.error is None)

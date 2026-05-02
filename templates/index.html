@@ -1,1488 +1,434 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BIST Tarayıcı</title>
-  <style>
-    /* ── Reset & Base ──────────────────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+{% extends "base.html" %}
+{% block title %}BIST Tarayıcı v2 — Tarama{% endblock %}
+{% block nav_home %}active{% endblock %}
 
-    :root {
-      --bg:           #f5f6fa;
-      --surface:      #ffffff;
-      --border:       #e2e8f0;
-      --text:         #1a202c;
-      --text-muted:   #718096;
-      --green:        #22543d;
-      --green-bg:     #c6f6d5;
-      --red:          #742a2a;
-      --red-bg:       #fed7d7;
-      --neutral:      #4a5568;
+{% block content %}
+<div class="container">
 
-      /* Tier colors */
-      --s-bg:  #b7791f; --s-text: #ffffff;  /* gold */
-      --a-bg:  #2b6cb0; --a-text: #ffffff;  /* blue */
-      --b-bg:  #276749; --b-text: #ffffff;  /* green */
-      --c-bg:  #553c9a; --c-text: #ffffff;  /* purple */
-      --dash-bg: #a0aec0; --dash-text: #ffffff;
-
-      --radius: 12px;
-      --shadow: 0 2px 12px rgba(0,0,0,0.08);
-    }
-
-    html { font-size: 17px; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding-bottom: 2rem;
-    }
-
-    /* ── Header ────────────────────────────────────────────────────────── */
-    header {
-      background: var(--surface);
-      border-bottom: 2px solid var(--border);
-      padding: 1.2rem 1rem 1rem;
-      text-align: center;
-      box-shadow: var(--shadow);
-    }
-    header h1 {
-      font-size: 1.6rem;
-      font-weight: 800;
-      color: var(--text);
-      letter-spacing: -0.02em;
-    }
-    header h1 span { color: #c05621; }
-    .header-sub {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-top: 0.2rem;
-    }
-
-    /* ── Main container ────────────────────────────────────────────────── */
-    main {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 1.2rem 0.8rem;
-    }
-
-    /* ── Scan button ───────────────────────────────────────────────────── */
-    .scan-area {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
-    }
-
-    #scanBtn {
-      background: #c05621;
-      color: white;
-      border: none;
-      border-radius: 50px;
-      font-size: 1.4rem;
-      font-weight: 700;
-      padding: 0.85rem 3rem;
-      cursor: pointer;
-      box-shadow: 0 4px 16px rgba(192,86,33,0.35);
-      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
-      letter-spacing: 0.04em;
-      min-width: 200px;
-    }
-    #scanBtn:hover:not(:disabled) {
-      background: #9c4221;
-      box-shadow: 0 6px 20px rgba(192,86,33,0.45);
-      transform: translateY(-1px);
-    }
-    #scanBtn:active:not(:disabled) { transform: scale(0.97); }
-    #scanBtn:disabled {
-      background: #a0aec0;
-      cursor: not-allowed;
-      box-shadow: none;
-      transform: none;
-    }
-
-    /* ── Status bar ────────────────────────────────────────────────────── */
-    #statusBar {
-      display: none;
-      align-items: center;
-      gap: 0.6rem;
-      background: #ebf8ff;
-      border: 1px solid #bee3f8;
-      border-radius: 8px;
-      padding: 0.6rem 1rem;
-      font-size: 1rem;
-      color: #2c5282;
-      max-width: 460px;
-      width: 100%;
-    }
-    #statusBar.visible { display: flex; }
-    .spinner {
-      width: 20px; height: 20px;
-      border: 3px solid #bee3f8;
-      border-top-color: #2b6cb0;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      flex-shrink: 0;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    #progressBar {
-      width: 100%;
-      max-width: 460px;
-      height: 6px;
-      background: #e2e8f0;
-      border-radius: 99px;
-      overflow: hidden;
-      display: none;
-    }
-    #progressBar.visible { display: block; }
-    #progressFill {
-      height: 100%;
-      background: #c05621;
-      border-radius: 99px;
-      transition: width 0.3s ease;
-      width: 0%;
-    }
-
-    /* ── Timestamp ─────────────────────────────────────────────────────── */
-    .timestamp-block {
-      text-align: center;
-      margin-bottom: 1.2rem;
-    }
-    .timestamp-adana {
-      font-size: 0.95rem;
-      color: var(--text-muted);
-    }
-    .timestamp-kitchener {
-      font-size: 0.78rem;
-      color: #a0aec0;
-      margin-top: 2px;
-    }
-
-    /* ── Summary stats ─────────────────────────────────────────────────── */
-    .summary-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.6rem;
-      margin-bottom: 1.4rem;
-      justify-content: center;
-    }
-    .stat-pill {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 50px;
-      padding: 0.4rem 0.9rem;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .stat-pill.s { background: var(--s-bg); color: var(--s-text); }
-    .stat-pill.a { background: var(--a-bg); color: var(--a-text); }
-    .stat-pill.b { background: var(--b-bg); color: var(--b-text); }
-    .stat-pill.c { background: var(--c-bg); color: var(--c-text); }
-
-    /* ── Error ─────────────────────────────────────────────────────────── */
-    #errorBox {
-      display: none;
-      background: #fff5f5;
-      border: 1px solid #fc8181;
-      border-radius: 10px;
-      padding: 1rem 1.2rem;
-      color: #c53030;
-      font-size: 1rem;
-      margin-bottom: 1rem;
-    }
-    #errorBox.visible { display: block; }
-
-    /* ── Tier badge ────────────────────────────────────────────────────── */
-    .tier-badge {
-      display: inline-block;
-      border-radius: 50px;
-      font-size: 1rem;
-      font-weight: 800;
-      padding: 0.25rem 0.75rem;
-      min-width: 40px;
-      text-align: center;
-      letter-spacing: 0.04em;
-    }
-    .tier-S { background: var(--s-bg); color: var(--s-text); }
-    .tier-A { background: var(--a-bg); color: var(--a-text); }
-    .tier-B { background: var(--b-bg); color: var(--b-text); }
-    .tier-C { background: var(--c-bg); color: var(--c-text); }
-    .tier-- { background: var(--dash-bg); color: var(--dash-text); }
-
-    /* ── Change % badges ───────────────────────────────────────────────── */
-    .change-pos { color: var(--green); font-weight: 700; }
-    .change-neg { color: #c53030; font-weight: 700; }
-    .change-neu { color: var(--neutral); font-weight: 600; }
-
-    /* ── Signal tags ───────────────────────────────────────────────────── */
-    .signals { display: flex; flex-wrap: wrap; gap: 4px; }
-    .sig-tag {
-      background: #ebf4ff;
-      color: #2c5282;
-      border-radius: 50px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      padding: 2px 8px;
-      white-space: nowrap;
-    }
-
-    /* ── MOBILE: Card layout (default) ────────────────────────────────── */
-    .cards-container { display: flex; flex-direction: column; gap: 0.8rem; }
-
-    .stock-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1rem 1.1rem;
-      box-shadow: var(--shadow);
-      transition: box-shadow 0.15s;
-    }
-    .stock-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.13); }
-    .stock-card.tier-s-card { border-left: 4px solid var(--s-bg); }
-    .stock-card.tier-a-card { border-left: 4px solid var(--a-bg); }
-    .stock-card.tier-b-card { border-left: 4px solid var(--b-bg); }
-    .stock-card.tier-c-card { border-left: 4px solid var(--c-bg); }
-
-    .card-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 0.5rem;
-    }
-    .card-left { display: flex; align-items: center; gap: 0.6rem; }
-    .card-rank {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      font-weight: 700;
-      min-width: 22px;
-    }
-    .card-ticker {
-      font-size: 1.15rem;
-      font-weight: 800;
-      color: var(--text);
-    }
-    .card-name {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      margin-left: 0.2rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 180px;
-    }
-    .card-right { display: flex; align-items: center; gap: 0.5rem; }
-
-    .card-mid {
-      display: flex;
-      align-items: center;
-      gap: 1.2rem;
-      margin-bottom: 0.55rem;
-      flex-wrap: wrap;
-    }
-    .card-price {
-      font-size: 1.2rem;
-      font-weight: 800;
-      color: var(--text);
-    }
-    .card-meta {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-    .card-score {
-      font-size: 1.1rem;
-      font-weight: 800;
-      color: var(--text);
-    }
-
-    /* ── DESKTOP: Table layout ─────────────────────────────────────────── */
-    .table-container { display: none; }
-
-    .stock-table {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--surface);
-      border-radius: var(--radius);
-      overflow: hidden;
-      box-shadow: var(--shadow);
-      font-size: 0.95rem;
-    }
-    .stock-table thead th {
-      background: #2d3748;
-      color: #e2e8f0;
-      padding: 0.75rem 0.9rem;
-      text-align: left;
-      font-size: 0.82rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      white-space: nowrap;
-    }
-    .stock-table tbody tr {
-      border-bottom: 1px solid var(--border);
-      transition: background 0.1s;
-    }
-    .stock-table tbody tr:last-child { border-bottom: none; }
-    .stock-table tbody tr:hover { background: #f7fafc; }
-    .stock-table td {
-      padding: 0.7rem 0.9rem;
-      vertical-align: middle;
-    }
-    .td-rank { color: var(--text-muted); font-size: 0.85rem; font-weight: 700; }
-    .td-ticker { font-weight: 800; font-size: 1rem; }
-    .td-name { color: var(--text-muted); font-size: 0.85rem; max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .td-price { font-weight: 700; font-size: 1rem; }
-    .td-score { font-weight: 800; font-size: 1.05rem; }
-
-    /* ── Responsive breakpoint ─────────────────────────────────────────── */
-    @media (min-width: 768px) {
-      .cards-container { display: none; }
-      .table-container { display: block; }
-      main { padding: 1.5rem 1.2rem; }
-    }
-
-    /* ── Score filter bar ─────────────────────────────────────────────── */
-    .filter-bar {
-      display: none;
-      align-items: center;
-      gap: 0.6rem;
-      flex-wrap: wrap;
-      justify-content: center;
-      margin-bottom: 1.2rem;
-    }
-    .filter-bar.visible { display: flex; }
-    .filter-label {
-      font-size: 0.88rem;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-    .filter-input {
-      width: 72px;
-      padding: 0.35rem 0.6rem;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 0.9rem;
-      text-align: center;
-      background: var(--surface);
-      color: var(--text);
-    }
-    .filter-input:focus { outline: 2px solid #c05621; border-color: transparent; }
-    .filter-reset {
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 50px;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      padding: 0.3rem 0.75rem;
-      cursor: pointer;
-    }
-    .filter-reset:hover { background: var(--bg); }
-    .filter-count {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-    }
-    .ticker-search {
-      width: 110px;
-      padding: 0.35rem 0.6rem;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 0.9rem;
-      background: var(--surface);
-      color: var(--text);
-      text-transform: uppercase;
-    }
-    .ticker-search::placeholder { text-transform: none; }
-    .ticker-search:focus { outline: 2px solid #c05621; border-color: transparent; }
-    .filter-full-row {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      padding-top: 0.4rem;
-      border-top: 1px solid var(--border);
-    }
-    .sig-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-    }
-    .sig-chip {
-      background: var(--surface);
-      border: 1.5px solid var(--border);
-      border-radius: 50px;
-      font-size: 0.76rem;
-      font-weight: 600;
-      padding: 3px 10px;
-      cursor: pointer;
-      color: var(--text-muted);
-      transition: border-color 0.15s, background 0.15s, color 0.15s;
-    }
-    .sig-chip:hover { border-color: #c05621; color: #c05621; }
-    .sig-chip.active { background: #c05621; border-color: #c05621; color: #fff; }
-    .filter-divider {
-      width: 1px;
-      height: 20px;
-      background: var(--border);
-      margin: 0 0.2rem;
-    }
-
-    /* ── Empty state ───────────────────────────────────────────────────── */
-    .empty-state {
-      text-align: center;
-      padding: 3rem 1rem;
-      color: var(--text-muted);
-    }
-    .empty-state .big-icon { font-size: 3rem; margin-bottom: 0.5rem; }
-    .empty-state p { font-size: 1.1rem; }
-
-    /* ── Score breakdown ───────────────────────────────────────────────── */
-    .breakdown-btn {
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 50px;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      padding: 2px 8px;
-      cursor: pointer;
-      margin-top: 0.4rem;
-      transition: background 0.1s, color 0.1s;
-    }
-    .breakdown-btn:hover { background: var(--bg); color: var(--text); }
-
-    .breakdown-panel {
-      display: none;
-      margin-top: 0.5rem;
-      background: var(--bg);
-      border-radius: 8px;
-      padding: 0.6rem 0.75rem;
-      font-size: 0.82rem;
-    }
-    .breakdown-panel.open { display: block; }
-    .breakdown-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 2px 0;
-      color: var(--text);
-    }
-    .breakdown-row .sig-name { color: var(--text-muted); }
-    .breakdown-row .sig-weight { font-weight: 700; color: #276749; }
-    .breakdown-divider {
-      border: none;
-      border-top: 1px solid var(--border);
-      margin: 4px 0;
-    }
-    .breakdown-bonus { color: #c05621; font-weight: 600; font-size: 0.8rem; }
-    .breakdown-total { font-weight: 800; }
-
-    /* ── Table breakdown inline ────────────────────────────────────────── */
-    .td-score-wrap { display: flex; align-items: center; gap: 0.4rem; }
-
-    /* ── Indicator guide ───────────────────────────────────────────────── */
-    .guide-section {
-      max-width: 1200px;
-      margin: 0 auto 1.5rem;
-      padding: 0 0.8rem;
-    }
-    .guide-toggle {
-      width: 100%;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 0.75rem 1rem;
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: var(--text);
-      cursor: pointer;
-      text-align: left;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: var(--shadow);
-      transition: background 0.1s;
-    }
-    .guide-toggle:hover { background: var(--bg); }
-    .guide-toggle .arrow { transition: transform 0.2s; font-style: normal; }
-    .guide-toggle.open .arrow { transform: rotate(180deg); }
-
-    .guide-body {
-      display: none;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-top: none;
-      border-radius: 0 0 var(--radius) var(--radius);
-      padding: 1rem 1rem 0.5rem;
-      box-shadow: var(--shadow);
-    }
-    .guide-body.open { display: block; }
-
-    .guide-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.75rem;
-    }
-    @media (min-width: 600px) {
-      .guide-grid { grid-template-columns: 1fr 1fr; }
-    }
-    @media (min-width: 900px) {
-      .guide-grid { grid-template-columns: 1fr 1fr 1fr; }
-    }
-
-    .guide-card {
-      background: var(--bg);
-      border-radius: 8px;
-      padding: 0.7rem 0.85rem;
-      border-left: 3px solid var(--border);
-    }
-    .guide-card.domain-momentum  { border-color: #c05621; }
-    .guide-card.domain-volume    { border-color: #2b6cb0; }
-    .guide-card.domain-rs        { border-color: #276749; }
-    .guide-card.domain-structure { border-color: #553c9a; }
-    .guide-card.domain-volatility{ border-color: #b7791f; }
-    .guide-card.domain-oscillator{ border-color: #0987a0; }
-
-    .guide-card-name {
-      font-weight: 700;
-      font-size: 0.88rem;
-      color: var(--text);
-      margin-bottom: 0.2rem;
-    }
-    .guide-card-domain {
-      font-size: 0.72rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-      margin-bottom: 0.35rem;
-    }
-    .guide-card-desc {
-      font-size: 0.82rem;
-      color: var(--text);
-      line-height: 1.45;
-    }
-    .guide-card-weight {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      margin-top: 0.3rem;
-    }
-
-    /* ── AI Özet ───────────────────────────────────────────────────────── */
-    .ai-ozet-box {
-      background: linear-gradient(135deg, #fef9f0 0%, #fffdf7 100%);
-      border: 1px solid #f6ad55;
-      border-left: 4px solid #c05621;
-      border-radius: 10px;
-      padding: 0.85rem 1rem;
-      font-size: 0.86rem;
-      color: var(--text);
-      line-height: 1.65;
-    }
-
-    /* ── Footer ────────────────────────────────────────────────────────── */
-    footer {
-      text-align: center;
-      padding: 1.2rem;
-      font-size: 0.8rem;
-      color: #a0aec0;
-    }
-
-    /* ── Clickable ticker ──────────────────────────────────────────────── */
-    .clickable-ticker {
-      cursor: pointer;
-      color: #c05621;
-      text-decoration: underline dotted;
-      transition: color 0.15s;
-    }
-    .clickable-ticker:hover { color: #9c4221; }
-
-    /* ── Strategy Modal ────────────────────────────────────────────────── */
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.45);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-    }
-    .modal-overlay.open { display: flex; }
-
-    .modal {
-      background: var(--surface);
-      border-radius: 16px;
-      width: 100%;
-      max-width: 520px;
-      max-height: 90vh;
-      overflow-y: auto;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.25);
-      animation: slideUp 0.2s ease;
-    }
-    @keyframes slideUp {
-      from { transform: translateY(24px); opacity: 0; }
-      to   { transform: translateY(0);    opacity: 1; }
-    }
-
-    .modal-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1.1rem 1.3rem 0.9rem;
-      border-bottom: 1px solid var(--border);
-    }
-    .modal-title {
-      display: flex;
-      align-items: baseline;
-      gap: 0.5rem;
-    }
-    .modal-ticker {
-      font-size: 1.4rem;
-      font-weight: 900;
-      color: var(--text);
-    }
-    .modal-company {
-      font-size: 0.88rem;
-      color: var(--text-muted);
-    }
-    .modal-close {
-      background: none;
-      border: none;
-      font-size: 1.4rem;
-      cursor: pointer;
-      color: var(--text-muted);
-      line-height: 1;
-      padding: 0.2rem 0.4rem;
-      border-radius: 6px;
-    }
-    .modal-close:hover { background: var(--bg); color: var(--text); }
-
-    .modal-body { padding: 1.2rem 1.3rem; }
-
-    /* Stock info row */
-    .modal-info-row {
-      display: flex;
-      gap: 1.5rem;
-      flex-wrap: wrap;
-      margin-bottom: 1.2rem;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid var(--border);
-    }
-    .modal-info-item { display: flex; flex-direction: column; gap: 2px; }
-    .modal-info-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
-    .modal-info-value { font-size: 1.05rem; font-weight: 700; color: var(--text); }
-
-    /* Strategy section */
-    .strategy-section { margin-bottom: 1.2rem; }
-    .strategy-title {
-      font-size: 0.78rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--text-muted);
-      margin-bottom: 0.6rem;
-    }
-
-    /* Entry zone */
-    .entry-box {
-      background: #fffbeb;
-      border: 1px solid #f6e05e;
-      border-radius: 10px;
-      padding: 0.75rem 1rem;
-      margin-bottom: 0.75rem;
-    }
-    .entry-box-title { font-size: 0.78rem; font-weight: 700; color: #744210; margin-bottom: 0.2rem; }
-    .entry-box-value { font-size: 1.1rem; font-weight: 800; color: #744210; }
-    .entry-box-note { font-size: 0.78rem; color: #92400e; margin-top: 0.25rem; }
-
-    /* Levels grid */
-    .levels-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 0.6rem;
-      margin-bottom: 0.75rem;
-    }
-    .level-card {
-      border-radius: 10px;
-      padding: 0.65rem 0.75rem;
-      text-align: center;
-    }
-    .level-card.sl  { background: #fff5f5; border: 1px solid #fc8181; }
-    .level-card.tp1 { background: #f0fff4; border: 1px solid #68d391; }
-    .level-card.tp2 { background: #ebf8ff; border: 1px solid #63b3ed; }
-    .level-card-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
-    .level-card.sl  .level-card-label { color: #c53030; }
-    .level-card.tp1 .level-card-label { color: #276749; }
-    .level-card.tp2 .level-card-label { color: #2c5282; }
-    .level-card-price { font-size: 1.05rem; font-weight: 800; color: var(--text); }
-    .level-card-pct { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
-
-    /* Risk bar */
-    .risk-bar-row {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      background: var(--bg);
-      border-radius: 8px;
-      padding: 0.6rem 0.9rem;
-      font-size: 0.85rem;
-      flex-wrap: wrap;
-    }
-    .risk-label { color: var(--text-muted); font-size: 0.78rem; }
-    .risk-value { font-weight: 700; color: #c53030; }
-    .rr-value  { font-weight: 700; color: #276749; }
-
-    /* Notes */
-    .strategy-notes {
-      background: #f7fafc;
-      border-radius: 8px;
-      padding: 0.75rem 0.9rem;
-      font-size: 0.82rem;
-      color: var(--text);
-      line-height: 1.55;
-    }
-    .strategy-notes strong { color: var(--text); }
-
-    /* Disclaimer */
-    .modal-disclaimer {
-      font-size: 0.72rem;
-      color: #a0aec0;
-      text-align: center;
-      padding: 0.75rem 1.3rem 1rem;
-      border-top: 1px solid var(--border);
-    }
-  </style>
-</head>
-<body>
-
-<header>
-  <h1>BIST <span>Tarayıcı</span></h1>
-  <div class="header-sub">Borsa İstanbul • Kişisel Kullanım</div>
-</header>
-
-<main>
-  <!-- Scan button & status -->
-  <div class="scan-area">
-    <button id="scanBtn" onclick="startScan()">🔍 Tara</button>
-    <div id="statusBar">
+  <!-- Scan controls -->
+  <div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;margin-bottom:1.5rem;">
+    <button id="scanBtn" class="btn btn-primary" onclick="startScan()">🔍 Tara</button>
+    <div id="statusBar" class="status-bar" style="display:none;max-width:460px;width:100%">
       <div class="spinner"></div>
       <span id="statusText">Taranıyor... lütfen bekleyin</span>
     </div>
-    <div id="progressBar"><div id="progressFill"></div></div>
+    <div id="progressWrap" style="display:none;width:100%;max-width:460px;">
+      <div class="progress-wrap"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
   </div>
 
-  <!-- Error box -->
-  <div id="errorBox"></div>
+  <div id="errorBox" class="error-box" style="display:none"></div>
 
   <!-- Timestamp -->
-  <div class="timestamp-block" id="timestampBlock" style="display:none">
-    <div class="timestamp-adana" id="tsAdana"></div>
-    <div class="timestamp-kitchener" id="tsKitchener"></div>
+  <div id="timestampBlock" style="display:none;text-align:center;margin-bottom:1rem;">
+    <div style="font-size:0.9rem;color:var(--text-muted)" id="tsAdana"></div>
+    <div style="font-size:0.78rem;color:#4b5563;margin-top:2px" id="tsKitchener"></div>
   </div>
 
   <!-- Summary pills -->
   <div class="summary-row" id="summaryRow" style="display:none"></div>
 
-  <!-- Score filter -->
-  <div class="filter-bar" id="filterBar">
-    <span class="filter-label">Hisse Ara:</span>
-    <input class="ticker-search" id="tickerSearch" type="text" placeholder="Ticker..." oninput="applyFilter()">
-    <div class="filter-divider"></div>
-    <span class="filter-label">Puan Aralığı:</span>
-    <input class="filter-input" id="filterMin" type="number" min="0" step="0.1" placeholder="Min" oninput="applyFilter()">
-    <span class="filter-label">—</span>
-    <input class="filter-input" id="filterMax" type="number" min="0" step="0.1" placeholder="Max" oninput="applyFilter()">
-    <button class="filter-reset" onclick="resetFilter()">Temizle</button>
-    <span class="filter-count" id="filterCount"></span>
-    <div class="filter-full-row">
-      <span class="filter-label">Sinyal:</span>
-      <div class="sig-chips" id="sigChips">
-        <button class="sig-chip" data-sig="Güçlü Momentum" onclick="toggleSigChip(this)">Güçlü Momentum</button>
-        <button class="sig-chip" data-sig="Boşluk Yukarı" onclick="toggleSigChip(this)">Boşluk Yukarı</button>
-        <button class="sig-chip" data-sig="Yüksek Hacim" onclick="toggleSigChip(this)">Yüksek Hacim</button>
-        <button class="sig-chip" data-sig="Artan Hacim" onclick="toggleSigChip(this)">Artan Hacim</button>
-        <button class="sig-chip" data-sig="Güçlü RS" onclick="toggleSigChip(this)">Güçlü RS</button>
-        <button class="sig-chip" data-sig="Pozitif RS" onclick="toggleSigChip(this)">Pozitif RS</button>
-        <button class="sig-chip" data-sig="EMA20 Üstü" onclick="toggleSigChip(this)">EMA20 Üstü</button>
-        <button class="sig-chip" data-sig="EMA50 Üstü" onclick="toggleSigChip(this)">EMA50 Üstü</button>
-        <button class="sig-chip" data-sig="52H Yakını" onclick="toggleSigChip(this)">52H Yakını</button>
-        <button class="sig-chip" data-sig="Yüksek ADR" onclick="toggleSigChip(this)">Yüksek ADR</button>
-        <button class="sig-chip" data-sig="RSI Aşırı Satım" onclick="toggleSigChip(this)">RSI Aşırı Satım</button>
-      </div>
+  <!-- Filter bar -->
+  <div id="filterBar" style="display:none;margin-bottom:1.2rem;">
+    <div class="filter-bar">
+      <span class="filter-label">Ara:</span>
+      <input class="ticker-search" id="tickerSearch" type="text" placeholder="Ticker..." oninput="applyFilter()">
+      <span class="filter-label">Puan:</span>
+      <input class="filter-input" id="filterMin" type="number" min="0" max="100" step="1" placeholder="Min" oninput="applyFilter()">
+      <span class="filter-label">—</span>
+      <input class="filter-input" id="filterMax" type="number" min="0" max="100" step="1" placeholder="Max" oninput="applyFilter()">
+      <button class="btn btn-ghost btn-sm" onclick="resetFilter()">Temizle</button>
+      <span style="font-size:0.82rem;color:var(--text-muted)" id="filterCount"></span>
     </div>
+    <div class="sig-chips" id="sigChips" style="margin-top:0.5rem"></div>
   </div>
 
-  <!-- Results: Mobile cards -->
-  <div class="cards-container" id="cardsContainer">
-    <div class="empty-state">
-      <div class="big-icon">📊</div>
-      <p>Taramayı başlatmak için <strong>Tara</strong> düğmesine basın.</p>
-    </div>
+  <!-- Mobile cards -->
+  <div class="mobile-only" id="cardsContainer">
+    <div class="empty-state"><div class="icon">📊</div><p>Taramayı başlatmak için <strong>Tara</strong> düğmesine basın.</p></div>
   </div>
 
-  <!-- Results: Desktop table -->
-  <div class="table-container" id="tableContainer">
-    <div class="empty-state">
-      <div class="big-icon">📊</div>
-      <p>Taramayı başlatmak için <strong>Tara</strong> düğmesine basın.</p>
-    </div>
+  <!-- Desktop table -->
+  <div class="desktop-only" id="tableContainer">
+    <div class="empty-state"><div class="icon">📊</div><p>Taramayı başlatmak için <strong>Tara</strong> düğmesine basın.</p></div>
   </div>
-</main>
 
-<!-- Indicator guide -->
-<div class="guide-section">
-  <button class="guide-toggle" onclick="toggleGuide(this)">
-    📖 Göstergeler Nasıl Çalışır?
-    <i class="arrow">▾</i>
-  </button>
-  <div class="guide-body">
-    <div class="guide-grid">
-
-      <div class="guide-card domain-momentum">
-        <div class="guide-card-name">Güçlü Momentum (Gap Up + High Volume)</div>
-        <div class="guide-card-domain">Momentum</div>
-        <div class="guide-card-desc">Hisse hem %5'ten fazla boşlukla açılmış hem de o gün hacmi ortalamanın 3 katının üzerinde — bu ikili kombinasyon, ciddi bir alıcı baskısını gösterir.</div>
-        <div class="guide-card-weight">Ağırlık: 3.0</div>
-      </div>
-
-      <div class="guide-card domain-momentum">
-        <div class="guide-card-name">Boşluk Yukarı (Gap Up)</div>
-        <div class="guide-card-domain">Momentum</div>
-        <div class="guide-card-desc">Hisse, önceki kapanışın %3'ten fazla üzerinde açılmış. Güçlü bir haber veya alım iştahı olduğunu işaret eder.</div>
-        <div class="guide-card-weight">Ağırlık: 1.5</div>
-      </div>
-
-      <div class="guide-card domain-volume">
-        <div class="guide-card-name">Yüksek Hacim (High Volume 3×)</div>
-        <div class="guide-card-domain">Hacim</div>
-        <div class="guide-card-desc">Bugünün işlem hacmi, son 20 günün ortalamasının 3 katı veya üzerinde. Bu kadar yüksek hacim, büyük oyuncuların harekete geçtiğine işaret eder.</div>
-        <div class="guide-card-weight">Ağırlık: 2.0</div>
-      </div>
-
-      <div class="guide-card domain-volume">
-        <div class="guide-card-name">Artan Hacim (Increasing Volume 2×)</div>
-        <div class="guide-card-domain">Hacim</div>
-        <div class="guide-card-desc">Bugünün hacmi 20 günlük ortalamanın 2 katı civarında. Normalden belirgin şekilde daha fazla ilgi var, ama henüz olağanüstü sayılmaz.</div>
-        <div class="guide-card-weight">Ağırlık: 1.0</div>
-      </div>
-
-      <div class="guide-card domain-rs">
-        <div class="guide-card-name">Güçlü RS (Strong Relative Strength)</div>
-        <div class="guide-card-domain">Göreceli Güç</div>
-        <div class="guide-card-desc">Hisse, BIST 100 endeksinden %3'ten fazla daha iyi performans gösteriyor. Piyasa düşerken bile yükselen ya da piyasadan çok daha hızlı yükselen hisseler bu sinyali alır.</div>
-        <div class="guide-card-weight">Ağırlık: 2.0</div>
-      </div>
-
-      <div class="guide-card domain-rs">
-        <div class="guide-card-name">Pozitif RS (Positive Relative Strength)</div>
-        <div class="guide-card-domain">Göreceli Güç</div>
-        <div class="guide-card-desc">Hisse, BIST 100 endeksini %1'den fazla geride bırakıyor. Piyasanın biraz üzerinde bir güç var, ama fark henüz çarpıcı değil.</div>
-        <div class="guide-card-weight">Ağırlık: 1.0</div>
-      </div>
-
-      <div class="guide-card domain-structure">
-        <div class="guide-card-name">EMA20 Üstü (Above EMA20)</div>
-        <div class="guide-card-domain">Yapı</div>
-        <div class="guide-card-desc">Hisse fiyatı, 20 günlük üstel hareketli ortalamanın üzerinde. Kısa vadeli trendin yönü yukarı demektir.</div>
-        <div class="guide-card-weight">Ağırlık: 1.0</div>
-      </div>
-
-      <div class="guide-card domain-structure">
-        <div class="guide-card-name">EMA50 Üstü (Above EMA50)</div>
-        <div class="guide-card-domain">Yapı</div>
-        <div class="guide-card-desc">Fiyat, 50 günlük hareketli ortalamanın üzerinde seyrediyor. Orta vadeli trendin sağlıklı olduğunu ve hissenin "doğru tarafta" işlem gördüğünü gösterir.</div>
-        <div class="guide-card-weight">Ağırlık: 1.5</div>
-      </div>
-
-      <div class="guide-card domain-structure">
-        <div class="guide-card-name">52H Yakını (Near 52-Week High)</div>
-        <div class="guide-card-domain">Yapı</div>
-        <div class="guide-card-desc">Hisse, son 52 haftanın en yüksek seviyesinin %5 yakınında. Zirveye yakın işlem gören hisseler genellikle güçlü bir momentum içindedir.</div>
-        <div class="guide-card-weight">Ağırlık: 1.5</div>
-      </div>
-
-      <div class="guide-card domain-volatility">
-        <div class="guide-card-name">Yüksek ADR (High Average Daily Range)</div>
-        <div class="guide-card-domain">Volatilite</div>
-        <div class="guide-card-desc">Son 20 günün ortalama günlük fiyat aralığı (Gün İçi Yüksek−Düşük), kapanışa oranla %3'ün üzerinde. Hisse çok geniş salınımlar yapıyor — hem fırsat hem risk demektir.</div>
-        <div class="guide-card-weight">Ağırlık: 1.0</div>
-      </div>
-
-      <div class="guide-card domain-oscillator">
-        <div class="guide-card-name">RSI Aşırı Satım (RSI Oversold ≤ 30)</div>
-        <div class="guide-card-domain">Osilatör</div>
-        <div class="guide-card-desc">14 günlük RSI 30 veya altında. Hisse teknik olarak aşırı satım bölgesinde; potansiyel bir geri dönüş fırsatına işaret eder. Diğer sinyallerle birleştiğinde güçlü bir kontrarian sinyali oluşturur.</div>
-        <div class="guide-card-weight">Ağırlık: 1.5</div>
-      </div>
-
-    </div>
-    <p style="margin-top:0.85rem; font-size:0.78rem; color:var(--text-muted); text-align:center;">
-      3 veya daha fazla farklı kategoriden sinyal gelirse toplam puan ×1.2 çarpanıyla artırılır (çeşitlilik bonusu).
-    </p>
-  </div>
 </div>
 
 <!-- Strategy Modal -->
 <div class="modal-overlay" id="strategyModal" onclick="closeModalOnOverlay(event)">
   <div class="modal" id="modalBox">
     <div class="modal-header">
-      <div class="modal-title">
-        <span class="modal-ticker" id="modalTicker"></span>
-        <span class="modal-company" id="modalCompany"></span>
+      <div>
+        <span style="font-size:1.35rem;font-weight:900" id="modalTicker"></span>
+        <span style="font-size:0.88rem;color:var(--text-muted);margin-left:0.5rem" id="modalCompany"></span>
       </div>
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-body">
-      <!-- Stock info -->
-      <div class="modal-info-row" id="modalInfoRow"></div>
+      <div class="info-row" id="modalInfoRow"></div>
 
-      <!-- Entry zone -->
-      <div class="strategy-section">
-        <div class="strategy-title">📍 Giriş Bölgesi</div>
-        <div class="entry-box">
-          <div class="entry-box-title">Önerilen Giriş</div>
-          <div class="entry-box-value" id="modalEntry"></div>
-          <div class="entry-box-note" id="modalEntryNote"></div>
-        </div>
+      <!-- Five-set score bars -->
+      <div style="margin-bottom:1.1rem">
+        <div class="section-title">Kompozit Puan (v2.0)</div>
+        <div class="score-sets" id="modalScoreSets"></div>
       </div>
+
+      <!-- Signal -->
+      <div id="modalSignalBox" style="margin-bottom:1rem"></div>
 
       <!-- Levels -->
-      <div class="strategy-section">
-        <div class="strategy-title">🎯 Seviyeler</div>
+      <div style="margin-bottom:1rem">
+        <div class="section-title">Seviyeler</div>
         <div class="levels-grid" id="modalLevels"></div>
-        <div class="risk-bar-row" id="modalRiskBar"></div>
-      </div>
-
-      <!-- Notes -->
-      <div class="strategy-section">
-        <div class="strategy-title">📋 Strateji Notu</div>
-        <div class="strategy-notes" id="modalNotes"></div>
+        <div id="modalRiskBar" style="font-size:0.85rem;color:var(--text-muted)"></div>
       </div>
 
       <!-- AI Özet -->
-      <div class="strategy-section">
-        <div class="strategy-title">✨ AI Özet</div>
-        <div class="ai-ozet-box" id="modalAiOzet"></div>
+      <div>
+        <div class="section-title">Değerlendirme</div>
+        <div id="modalAiOzet" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.8rem 1rem;font-size:0.85rem;line-height:1.65;color:var(--text)"></div>
+      </div>
+
+      <!-- Analyse link -->
+      <div style="margin-top:1rem;text-align:center">
+        <a id="modalAnalyzeLink" href="#" class="btn btn-ghost btn-sm">📈 Detaylı Analiz</a>
       </div>
     </div>
-    <div class="modal-disclaimer">
-      Bu bilgiler yalnızca kişisel analiz amaçlıdır. Yatırım tavsiyesi değildir.
-    </div>
+    <div class="modal-footer">Bu bilgiler yalnızca kişisel analiz amaçlıdır. Yatırım tavsiyesi değildir.</div>
   </div>
 </div>
+{% endblock %}
 
-<footer>EOD / Gecikmeli Veri • Yalnızca Kişisel Kullanım</footer>
-
+{% block scripts %}
 <script>
-  let pollInterval = null;
-  let allResults = [];
+let pollInterval = null;
+let allResults   = [];
+let allSignals   = new Set();
 
-  function tierClass(tier) {
-    return { S: 'tier-S', A: 'tier-A', B: 'tier-B', C: 'tier-C' }[tier] || 'tier--';
-  }
-  function cardTierClass(tier) {
-    return { S: 'tier-s-card', A: 'tier-a-card', B: 'tier-b-card', C: 'tier-c-card' }[tier] || '';
-  }
-  function changeClass(v) {
-    if (v > 0) return 'change-pos';
-    if (v < 0) return 'change-neg';
-    return 'change-neu';
-  }
-  function fmtChange(v) {
-    const sign = v > 0 ? '+' : '';
-    return `${sign}${v.toFixed(2)}%`;
-  }
-  function fmtPrice(v) {
-    return v.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-  function fmtRvol(v) {
-    return v > 0 ? `${v.toFixed(1)}x` : '-';
-  }
-  function sigTags(signals) {
-    if (!signals || !signals.length) return '<span style="color:#a0aec0;font-size:0.8rem">—</span>';
-    return signals.map(s => `<span class="sig-tag">${s}</span>`).join('');
-  }
+const FIVE_SETS = [
+  { key: 'regime_score',      label: 'Piyasa Rejimi', cls: 'bar-regime',     wt: 20 },
+  { key: 'momentum_score',    label: 'Momentum',      cls: 'bar-momentum',   wt: 20 },
+  { key: 'structure_score',   label: 'Yapı',          cls: 'bar-structure',  wt: 30 },
+  { key: 'smart_money_score', label: 'Akıllı Para',   cls: 'bar-smartmoney', wt: 15 },
+  { key: 'catalyst_score',    label: 'Katalizör',     cls: 'bar-catalyst',   wt: 15 },
+];
 
-  function breakdownHTML(bd, id) {
-    if (!bd || !bd.signals || !bd.signals.length) return '';
-    const rows = bd.signals.map(s =>
-      `<div class="breakdown-row"><span class="sig-name">${s.label}</span><span class="sig-weight">+${s.weight.toFixed(1)}</span></div>`
-    ).join('');
-    const bonus = bd.diversity_bonus
-      ? `<div class="breakdown-row breakdown-bonus"><span>Çeşitlilik bonusu (×1.2)</span><span>+${(bd.final_score - bd.base_score).toFixed(2)}</span></div>`
-      : '';
+function tierClass(t) { return `tier-${t || '-'}`; }
+function cardTierClass(t) { return {S:'tier-s-card',A:'tier-a-card',B:'tier-b-card',C:'tier-c-card'}[t]||''; }
+function changeClass(v) { return v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu'; }
+function fmtChange(v) { const s = v > 0 ? '+' : ''; return `${s}${v.toFixed(2)}%`; }
+function fmtPrice(v) { return v.toLocaleString('tr-TR', {minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtRvol(v) { return v > 0 ? `${v.toFixed(1)}x` : '-'; }
+function tierBadge(t) { return `<span class="tier-badge ${tierClass(t)}">${t||'-'}</span>`; }
+
+function sigTags(signals) {
+  if (!signals || !signals.length) return '<span style="color:var(--text-muted);font-size:0.8rem">—</span>';
+  return signals.map(s => `<span class="sig-tag">${s}</span>`).join('');
+}
+
+function scoreSetsHTML(r) {
+  return FIVE_SETS.map(s => {
+    const val = r[s.key] || 0;
     return `
-      <button class="breakdown-btn" onclick="toggleBreakdown('${id}')">Puan Detayı ▾</button>
-      <div class="breakdown-panel" id="bd-${id}">
-        ${rows}
-        ${bd.diversity_bonus ? '<hr class="breakdown-divider">' + bonus : ''}
-        <hr class="breakdown-divider">
-        <div class="breakdown-row breakdown-total"><span>Toplam Puan</span><span>${bd.final_score}</span></div>
+      <div class="score-set-row">
+        <span class="score-set-label">${s.label} <span style="font-size:0.65rem;color:#4b5563">(${s.wt}%)</span></span>
+        <div class="score-set-bar-wrap">
+          <div class="score-set-bar ${s.cls}" style="width:${val}%"></div>
+        </div>
+        <span class="score-set-val" style="color:var(--text)">${val.toFixed(0)}</span>
       </div>
     `;
-  }
+  }).join('');
+}
 
-  function toggleBreakdown(id) {
-    const panel = document.getElementById('bd-' + id);
-    const btn = panel.previousElementSibling;
-    const open = panel.classList.toggle('open');
-    btn.textContent = open ? 'Puan Detayı ▴' : 'Puan Detayı ▾';
-  }
+function renderSummary(results) {
+  const counts = {S:0,A:0,B:0,C:0};
+  results.forEach(r => { if (counts[r.tier] !== undefined) counts[r.tier]++; });
+  document.getElementById('summaryRow').style.display = 'flex';
+  document.getElementById('summaryRow').innerHTML =
+    `<span class="stat-pill total">Toplam: ${results.length}</span>` +
+    `<span class="stat-pill s">S: ${counts.S}</span>` +
+    `<span class="stat-pill a">A: ${counts.A}</span>` +
+    `<span class="stat-pill b">B: ${counts.B}</span>` +
+    `<span class="stat-pill c">C: ${counts.C}</span>`;
+}
 
-  function toggleGuide(btn) {
-    btn.classList.toggle('open');
-    btn.nextElementSibling.classList.toggle('open');
-  }
-  function tierBadge(tier) {
-    return `<span class="tier-badge ${tierClass(tier)}">${tier}</span>`;
-  }
+function buildSigChips() {
+  const container = document.getElementById('sigChips');
+  container.innerHTML = [...allSignals].map(s =>
+    `<button class="sig-chip" data-sig="${s}" onclick="toggleSigChip(this)">${s}</button>`
+  ).join('');
+}
 
-  function renderSummary(results) {
-    const counts = { S: 0, A: 0, B: 0, C: 0 };
-    results.forEach(r => { if (counts[r.tier] !== undefined) counts[r.tier]++; });
-    const total = results.length;
-    const row = document.getElementById('summaryRow');
-    row.style.display = 'flex';
-    row.innerHTML =
-      `<span class="stat-pill">Toplam: ${total}</span>` +
-      `<span class="stat-pill s">S: ${counts.S}</span>` +
-      `<span class="stat-pill a">A: ${counts.A}</span>` +
-      `<span class="stat-pill b">B: ${counts.B}</span>` +
-      `<span class="stat-pill c">C: ${counts.C}</span>`;
-  }
-
-  function renderCards(results) {
-    const container = document.getElementById('cardsContainer');
-    if (!results.length) {
-      container.innerHTML = '<div class="empty-state"><div class="big-icon">🔍</div><p>Sinyal bulunamadı.</p></div>';
-      return;
-    }
-    container.innerHTML = results.map(r => `
-      <div class="stock-card ${cardTierClass(r.tier)}">
-        <div class="card-top">
-          <div class="card-left">
-            <span class="card-rank">#${r.rank}</span>
-            <span class="card-ticker clickable-ticker" onclick='openStrategy(${JSON.stringify(r)})'>${r.ticker}</span>
-            <span class="card-name">${r.company_name}</span>
-          </div>
-          <div class="card-right">
-            ${tierBadge(r.tier)}
-          </div>
+function renderCards(results) {
+  const c = document.getElementById('cardsContainer');
+  if (!results.length) { c.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>Sinyal bulunamadı.</p></div>'; return; }
+  c.innerHTML = results.map(r => `
+    <div class="stock-card ${cardTierClass(r.tier)}" style="margin-bottom:0.7rem">
+      <div class="card-top">
+        <div class="card-left">
+          <span class="card-rank">#${r.rank}</span>
+          <span class="card-ticker clickable" onclick='openStrategy(${JSON.stringify(r)})'>${r.ticker}</span>
+          <span class="card-name">${r.company_name}</span>
         </div>
-        <div class="card-mid">
-          <span class="card-price">${fmtPrice(r.price)} ₺</span>
-          <span class="${changeClass(r.change_pct)}">${fmtChange(r.change_pct)}</span>
-          <span class="card-meta">RVOL ${fmtRvol(r.rvol)}</span>
-          <span class="card-score">Puan: ${r.score}</span>
-        </div>
-        <div class="signals">${sigTags(r.signals)}</div>
-        ${breakdownHTML(r.score_breakdown, 'card-' + r.rank)}
+        <div style="display:flex;align-items:center;gap:0.4rem">${tierBadge(r.tier)}</div>
       </div>
-    `).join('');
+      <div class="card-mid">
+        <span class="card-price">${fmtPrice(r.price)} ₺</span>
+        <span class="${changeClass(r.change_pct)}">${fmtChange(r.change_pct)}</span>
+        <span style="color:var(--text-muted);font-size:0.85rem">RVOL ${fmtRvol(r.rvol)}</span>
+        <span class="card-score">${r.score.toFixed(1)}</span>
+      </div>
+      <div class="score-sets" style="margin-bottom:0.4rem">${scoreSetsHTML(r)}</div>
+      <div class="signals">${sigTags(r.signals)}</div>
+    </div>
+  `).join('');
+}
+
+function renderTable(results) {
+  const c = document.getElementById('tableContainer');
+  if (!results.length) { c.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>Sinyal bulunamadı.</p></div>'; return; }
+  const rows = results.map(r => `
+    <tr>
+      <td style="color:var(--text-muted);font-size:0.82rem;font-weight:700">${r.rank}</td>
+      <td><span class="clickable" onclick='openStrategy(${JSON.stringify(r)})'><strong>${r.ticker}</strong></span></td>
+      <td style="color:var(--text-muted);font-size:0.85rem;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.company_name}</td>
+      <td style="font-family:'Space Mono',monospace;font-weight:700">${fmtPrice(r.price)} ₺</td>
+      <td class="${changeClass(r.change_pct)}">${fmtChange(r.change_pct)}</td>
+      <td style="font-family:'Space Mono',monospace">${fmtRvol(r.rvol)}</td>
+      <td>
+        <div class="score-sets" style="min-width:200px">${scoreSetsHTML(r)}</div>
+      </td>
+      <td style="font-family:'Space Mono',monospace;font-weight:800;font-size:1.1rem;color:var(--accent)">${r.score.toFixed(1)}</td>
+      <td>${tierBadge(r.tier)}</td>
+      <td><div class="signals" style="min-width:160px">${sigTags(r.signals)}</div></td>
+    </tr>
+  `).join('');
+  c.innerHTML = `
+    <div style="overflow-x:auto">
+    <table class="data-table">
+      <thead><tr>
+        <th>Sıra</th><th>Sembol</th><th>Şirket</th>
+        <th>Fiyat (₺)</th><th>Değişim%</th><th>RVOL</th>
+        <th>Puan Seti (Rejim/Mom/Yapı/Akıllı/Katalizör)</th>
+        <th>Kompozit</th><th>Kademe</th><th>Aktif Sinyaller</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </div>
+  `;
+}
+
+function toggleSigChip(el) { el.classList.toggle('active'); applyFilter(); }
+
+function applyFilter() {
+  const minVal    = parseFloat(document.getElementById('filterMin').value);
+  const maxVal    = parseFloat(document.getElementById('filterMax').value);
+  const query     = document.getElementById('tickerSearch').value.trim().toUpperCase();
+  const activeSigs = [...document.querySelectorAll('.sig-chip.active')].map(e => e.dataset.sig);
+
+  let filtered = allResults.filter(r => {
+    if (!isNaN(minVal) && r.score < minVal) return false;
+    if (!isNaN(maxVal) && r.score > maxVal) return false;
+    if (query && !r.ticker.includes(query)) return false;
+    if (activeSigs.length > 0 && !activeSigs.every(s => r.signals && r.signals.includes(s))) return false;
+    return true;
+  });
+
+  if (query) {
+    filtered.sort((a,b) => (a.ticker.startsWith(query)?0:1) - (b.ticker.startsWith(query)?0:1) || a.ticker.localeCompare(b.ticker));
   }
 
-  function renderTable(results) {
-    const container = document.getElementById('tableContainer');
-    if (!results.length) {
-      container.innerHTML = '<div class="empty-state"><div class="big-icon">🔍</div><p>Sinyal bulunamadı.</p></div>';
-      return;
-    }
-    const rows = results.map(r => `
-      <tr>
-        <td class="td-rank">${r.rank}</td>
-        <td class="td-ticker"><span class="clickable-ticker" onclick='openStrategy(${JSON.stringify(r)})'>${r.ticker}</span></td>
-        <td class="td-name">${r.company_name}</td>
-        <td class="td-price">${fmtPrice(r.price)} ₺</td>
-        <td class="${changeClass(r.change_pct)}">${fmtChange(r.change_pct)}</td>
-        <td>${fmtRvol(r.rvol)}</td>
-        <td class="td-score">
-          <div class="td-score-wrap">${r.score}${breakdownHTML(r.score_breakdown, 'tbl-' + r.rank)}</div>
-        </td>
-        <td>${tierBadge(r.tier)}</td>
-        <td><div class="signals">${sigTags(r.signals)}</div></td>
-      </tr>
-    `).join('');
-    container.innerHTML = `
-      <table class="stock-table">
-        <thead>
-          <tr>
-            <th>Sıra</th>
-            <th>Sembol</th>
-            <th>Şirket Adı</th>
-            <th>Fiyat (₺)</th>
-            <th>Değişim%</th>
-            <th>RVOL</th>
-            <th>Puan</th>
-            <th>Kademe</th>
-            <th>Aktif Sinyaller</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    `;
+  const isFiltered = !isNaN(minVal) || !isNaN(maxVal) || query || activeSigs.length > 0;
+  document.getElementById('filterCount').textContent = isFiltered ? `${filtered.length} / ${allResults.length}` : '';
+  renderCards(filtered);
+  renderTable(filtered);
+}
+
+function resetFilter() {
+  document.getElementById('filterMin').value = '';
+  document.getElementById('filterMax').value = '';
+  document.getElementById('tickerSearch').value = '';
+  document.getElementById('filterCount').textContent = '';
+  document.querySelectorAll('.sig-chip.active').forEach(e => e.classList.remove('active'));
+  renderCards(allResults);
+  renderTable(allResults);
+}
+
+function renderResults(results, tsAdana, tsKitchener) {
+  allResults = results;
+  allSignals = new Set(results.flatMap(r => r.signals || []));
+  renderSummary(results);
+  renderCards(results);
+  renderTable(results);
+  buildSigChips();
+  document.getElementById('filterBar').style.display = 'block';
+  if (tsAdana) {
+    document.getElementById('timestampBlock').style.display = 'block';
+    document.getElementById('tsAdana').textContent = `Son tarama: ${tsAdana} (İstanbul)`;
+    document.getElementById('tsKitchener').textContent = `Kitchener: ${tsKitchener}`;
   }
+}
 
-  function toggleSigChip(el) {
-    el.classList.toggle('active');
-    applyFilter();
-  }
+async function startScan() {
+  const btn = document.getElementById('scanBtn');
+  document.getElementById('errorBox').style.display = 'none';
+  btn.disabled = true;
+  document.getElementById('statusBar').style.display = 'flex';
+  document.getElementById('progressWrap').style.display = 'block';
 
-  function applyFilter() {
-    const minVal = parseFloat(document.getElementById('filterMin').value);
-    const maxVal = parseFloat(document.getElementById('filterMax').value);
-    const query = document.getElementById('tickerSearch').value.trim().toUpperCase();
-    const activeChips = [...document.querySelectorAll('.sig-chip.active')].map(el => el.dataset.sig);
-
-    let filtered = allResults.filter(r => {
-      if (!isNaN(minVal) && r.score < minVal) return false;
-      if (!isNaN(maxVal) && r.score > maxVal) return false;
-      if (query && !r.ticker.includes(query)) return false;
-      if (activeChips.length > 0 && !activeChips.every(sig => r.signals && r.signals.includes(sig))) return false;
-      return true;
-    });
-
-    if (query) {
-      filtered.sort((a, b) => {
-        const aStarts = a.ticker.startsWith(query) ? 0 : 1;
-        const bStarts = b.ticker.startsWith(query) ? 0 : 1;
-        return aStarts - bStarts || a.ticker.localeCompare(b.ticker);
-      });
-    }
-
-    const countEl = document.getElementById('filterCount');
-    const isFiltered = !isNaN(minVal) || !isNaN(maxVal) || query || activeChips.length > 0;
-    countEl.textContent = isFiltered ? `${filtered.length} / ${allResults.length} hisse` : '';
-    renderCards(filtered);
-    renderTable(filtered);
-  }
-
-  function resetFilter() {
-    document.getElementById('filterMin').value = '';
-    document.getElementById('filterMax').value = '';
-    document.getElementById('tickerSearch').value = '';
-    document.getElementById('filterCount').textContent = '';
-    document.querySelectorAll('.sig-chip.active').forEach(el => el.classList.remove('active'));
-    renderCards(allResults);
-    renderTable(allResults);
-  }
-
-  function renderResults(results, tsAdana, tsKitchener) {
-    allResults = results;
-    renderSummary(results);
-    renderCards(results);
-    renderTable(results);
-    document.getElementById('filterBar').classList.add('visible');
-
-    if (tsAdana) {
-      document.getElementById('timestampBlock').style.display = 'block';
-      document.getElementById('tsAdana').textContent = `Son tarama: ${tsAdana} (Adana)`;
-      document.getElementById('tsKitchener').textContent = `Kitchener ON: ${tsKitchener}`;
-    }
-  }
-
-  async function startScan() {
-    const btn = document.getElementById('scanBtn');
-    const statusBar = document.getElementById('statusBar');
-    const progressBar = document.getElementById('progressBar');
-    const errorBox = document.getElementById('errorBox');
-
-    errorBox.classList.remove('visible');
-    btn.disabled = true;
-    statusBar.classList.add('visible');
-    progressBar.classList.add('visible');
-
-    try {
-      const res = await fetch('/api/scan', { method: 'POST' });
-      const data = await res.json();
-      if (!data.ok) {
-        showError(data.message || 'Tarama başlatılamadı.');
-        btn.disabled = false;
-        statusBar.classList.remove('visible');
-        progressBar.classList.remove('visible');
-        return;
-      }
-    } catch (e) {
-      showError('Sunucuya bağlanılamadı.');
+  try {
+    const res  = await fetch('/api/scan', {method:'POST'});
+    const data = await res.json();
+    if (!data.ok) {
+      showError(data.message || 'Tarama başlatılamadı.');
       btn.disabled = false;
-      statusBar.classList.remove('visible');
-      progressBar.classList.remove('visible');
+      document.getElementById('statusBar').style.display = 'none';
+      document.getElementById('progressWrap').style.display = 'none';
       return;
     }
+  } catch(e) {
+    showError('Sunucuya bağlanılamadı.');
+    btn.disabled = false;
+    document.getElementById('statusBar').style.display = 'none';
+    document.getElementById('progressWrap').style.display = 'none';
+    return;
+  }
+  pollInterval = setInterval(pollStatus, 1500);
+}
 
-    // Poll for progress
-    pollInterval = setInterval(pollStatus, 1500);
+async function pollStatus() {
+  try {
+    const res   = await fetch('/api/status');
+    const state = await res.json();
+    if (state.total > 0) {
+      const pct = Math.min(100, Math.round(state.progress / state.total * 100));
+      document.getElementById('progressFill').style.width = pct + '%';
+      document.getElementById('statusText').textContent = `Taranıyor... ${state.progress} / ${state.total} hisse`;
+    }
+    if (!state.running) {
+      clearInterval(pollInterval);
+      document.getElementById('scanBtn').disabled = false;
+      document.getElementById('statusBar').style.display = 'none';
+      document.getElementById('progressWrap').style.display = 'none';
+      document.getElementById('progressFill').style.width = '0%';
+      if (state.error) { showError(state.error); return; }
+      loadResults();
+    }
+  } catch(e) {}
+}
+
+async function loadResults() {
+  try {
+    const res  = await fetch('/api/results');
+    const data = await res.json();
+    renderResults(data.results, data.last_scan_adana, data.last_scan_kitchener);
+  } catch(e) { showError('Sonuçlar yüklenemedi.'); }
+}
+
+function showError(msg) {
+  const b = document.getElementById('errorBox');
+  b.textContent = '⚠️ ' + msg;
+  b.style.display = 'block';
+}
+
+// ── Strategy modal ──────────────────────────────────────────────────────────
+function openStrategy(r) {
+  const price     = r.price;
+  const chgPct    = r.change_pct;
+  const adr       = r.adr || 3.0;
+  const signals   = r.signals || [];
+  const prevClose = price / (1 + chgPct / 100);
+
+  const hasGapCombo = signals.some(s => s.toLowerCase().includes('gap') && s.toLowerCase().includes('hacim'));
+  const hasGap      = signals.some(s => s.toLowerCase().includes('gap') || s.toLowerCase().includes('boşluk'));
+
+  let entry, entryNote, sl;
+  if (hasGapCombo) {
+    entry = prevClose * 1.01; entryNote = 'Gap-up: ilk geri çekilmede gir.'; sl = prevClose * 0.985;
+  } else if (hasGap) {
+    entry = price * 0.985; entryNote = 'Boşluk yukarı — geri çekilme beklenir.'; sl = prevClose * 0.99;
+  } else {
+    entry = price; entryNote = 'Mevcut fiyat bölgesinde giriş.'; sl = price * (1 - adr / 100);
   }
 
-  async function pollStatus() {
-    try {
-      const res = await fetch('/api/status');
-      const state = await res.json();
+  // Use VWAP as additional stop reference
+  const vwap = r.vwap;
+  if (vwap && vwap < entry * 0.99 && vwap > sl) sl = vwap * 0.995;
 
-      if (state.total > 0) {
-        const pct = Math.min(100, Math.round((state.progress / state.total) * 100));
-        document.getElementById('progressFill').style.width = pct + '%';
-        document.getElementById('statusText').textContent =
-          `Taranıyor... ${state.progress} / ${state.total} hisse`;
-      }
+  const risk   = entry - sl;
+  const tp1    = entry + risk;
+  const tp2    = entry + risk * 2;
+  const riskPct = ((entry - sl) / entry * 100).toFixed(1);
+  const tp1Pct  = ((tp1 - entry) / entry * 100).toFixed(1);
+  const tp2Pct  = ((tp2 - entry) / entry * 100).toFixed(1);
 
-      if (!state.running) {
-        clearInterval(pollInterval);
-        document.getElementById('scanBtn').disabled = false;
-        document.getElementById('statusBar').classList.remove('visible');
-        document.getElementById('progressBar').classList.remove('visible');
-        document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('modalTicker').textContent  = r.ticker;
+  document.getElementById('modalCompany').textContent = r.company_name || '';
+  document.getElementById('modalAnalyzeLink').href    = `/analyze/${r.ticker}`;
 
-        if (state.error) {
-          showError(state.error);
-          return;
-        }
-        loadResults();
-      }
-    } catch (e) {
-      // Network hiccup — keep polling
+  document.getElementById('modalInfoRow').innerHTML = `
+    <div class="info-item"><span class="info-label">Fiyat</span><span class="info-value" style="font-family:'Space Mono',monospace">${fmtPrice(price)} ₺</span></div>
+    <div class="info-item"><span class="info-label">Değişim</span><span class="info-value ${changeClass(chgPct)}">${fmtChange(chgPct)}</span></div>
+    <div class="info-item"><span class="info-label">RVOL</span><span class="info-value">${fmtRvol(r.rvol)}</span></div>
+    <div class="info-item"><span class="info-label">ADR</span><span class="info-value">${adr.toFixed(1)}%</span></div>
+    <div class="info-item"><span class="info-label">Puan / Kademe</span><span class="info-value">${r.score.toFixed(1)} ${tierBadge(r.tier)}</span></div>
+    ${vwap ? `<div class="info-item"><span class="info-label">VWAP (20g)</span><span class="info-value" style="${r.above_vwap?'color:#4ade80':'color:#f87171'}">${fmtPrice(vwap)} ₺</span></div>` : ''}
+  `;
+
+  document.getElementById('modalScoreSets').innerHTML = scoreSetsHTML(r);
+
+  const dirColor = '#4ade80';
+  document.getElementById('modalSignalBox').innerHTML = `
+    <div style="background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.25);border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:0.75rem">
+      <div class="section-title" style="margin-bottom:0.2rem">Giriş Bölgesi</div>
+      <div style="font-size:1.1rem;font-weight:800;color:#4ade80;font-family:'Space Mono',monospace">${fmtPrice(entry)} ₺</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">${entryNote}</div>
+    </div>
+  `;
+
+  document.getElementById('modalLevels').innerHTML = `
+    <div class="level-card sl"><div class="level-label">Stop Loss</div><div class="level-price">${fmtPrice(sl)} ₺</div><div class="level-pct">−${riskPct}%</div></div>
+    <div class="level-card tp1"><div class="level-label">TP 1 (1:1)</div><div class="level-price">${fmtPrice(tp1)} ₺</div><div class="level-pct">+${tp1Pct}%</div></div>
+    <div class="level-card tp2"><div class="level-label">TP 2 (2:1)</div><div class="level-price">${fmtPrice(tp2)} ₺</div><div class="level-pct">+${tp2Pct}%</div></div>
+  `;
+
+  document.getElementById('modalRiskBar').innerHTML =
+    `Risk: <strong style="color:#f87171">${riskPct}%</strong> &nbsp;|&nbsp; R/R: <strong style="color:#4ade80">1:2</strong> &nbsp;|&nbsp; Önceki Kapanış: ${fmtPrice(prevClose)} ₺`;
+
+  // Reasoning / AI özet
+  const reasoning = r.reasoning || '';
+  const sizeMap = {S:'Tam pozisyon',A:'2/3 pozisyon',B:'1/3 pozisyon',C:'Küçük deneme'};
+  const aiText = reasoning ||
+    `${r.tier} kademe sinyal. Kompozit puan: ${r.score.toFixed(1)}/100. ${sizeMap[r.tier]||'Dikkatli pozisyon'} önerilir.`;
+  document.getElementById('modalAiOzet').textContent = aiText;
+
+  document.getElementById('strategyModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('strategyModal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function closeModalOnOverlay(e) { if (e.target === document.getElementById('strategyModal')) closeModal(); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// On load: check if scan is running or results exist
+window.addEventListener('load', async () => {
+  try {
+    const res   = await fetch('/api/status');
+    const state = await res.json();
+    if (state.running) {
+      document.getElementById('scanBtn').disabled = true;
+      document.getElementById('statusBar').style.display = 'flex';
+      document.getElementById('progressWrap').style.display = 'block';
+      pollInterval = setInterval(pollStatus, 1500);
+    } else if (state.results && state.results.length) {
+      loadResults();
     }
-  }
-
-  async function loadResults() {
-    try {
-      const res = await fetch('/api/results');
-      const data = await res.json();
-      renderResults(data.results, data.last_scan_adana, data.last_scan_kitchener);
-    } catch (e) {
-      showError('Sonuçlar yüklenemedi.');
-    }
-  }
-
-  function showError(msg) {
-    const box = document.getElementById('errorBox');
-    box.textContent = '⚠️ ' + msg;
-    box.classList.add('visible');
-  }
-
-  // ── AI Özet generator ───────────────────────────────────────────────────────
-
-  function generateAiOzet(r) {
-    const signals  = r.signals || [];
-    const tier     = r.tier;
-    const chgPct   = r.change_pct;
-    const rvol     = r.rvol || 0;
-    const adr      = r.adr  || 0;
-    const sentences = [];
-
-    // 1. Ana sinyal cümlesi
-    if (signals.includes('Güçlü Momentum')) {
-      sentences.push(
-        `Bugün hem güçlü bir boşlukla açıldı hem de hacim normalin ${rvol.toFixed(1)} katına fırladı — ` +
-        `bu ikili kombinasyon, ciddi bir alıcı baskısının işaretidir.`
-      );
-    } else if (signals.includes('Boşluk Yukarı') && (signals.includes('Yüksek Hacim') || signals.includes('Artan Hacim'))) {
-      sentences.push(
-        `Önceki kapanışın belirgin üzerinde boşlukla açılırken işlem hacmi de normalin ${rvol.toFixed(1)} katına yükseldi.`
-      );
-    } else if (signals.includes('Boşluk Yukarı')) {
-      sentences.push(
-        `Önceki kapanışa göre %${Math.abs(chgPct).toFixed(1)} yukarıda boşlukla açıldı — güçlü bir alım iştahı var.`
-      );
-    } else if (signals.includes('Yüksek Hacim')) {
-      sentences.push(
-        `Olağandışı bir hacim patlaması yaşandı: bugünkü işlem hacmi 20 günlük ortalamanın ${rvol.toFixed(1)} katı. Bu kadar yüksek hacim genellikle büyük oyuncuların harekete geçtiğine işaret eder.`
-      );
-    } else if (signals.includes('Artan Hacim')) {
-      sentences.push(
-        `Normalden ${rvol.toFixed(1)} kat daha fazla hacimle işlem görüyor — belirgin bir ilgi artışı var ama henüz olağanüstü sayılmaz.`
-      );
-    } else if (signals.includes('Güçlü RS')) {
-      sentences.push(
-        `BIST 100'ü belirgin şekilde geride bırakarak öne çıktı — piyasadan bağımsız bir güç var.`
-      );
-    } else {
-      sentences.push(
-        `Birden fazla teknik göstergede olumlu sinyal verdi ve tarayıcının dikkatini çekti.`
-      );
-    }
-
-    // 2. Teyit cümleleri
-    const conf = [];
-    if (signals.includes('Güçlü RS') && !sentences[0].includes('geride bırak')) {
-      conf.push('BIST 100\'ü belirgin biçimde geride bırakıyor');
-    } else if (signals.includes('Pozitif RS')) {
-      conf.push('endeksten biraz daha iyi performans gösteriyor');
-    }
-    if (signals.includes('52H Yakını')) {
-      conf.push('52 haftalık zirvesinin yakınında işlem görüyor — önünde az direnç var');
-    }
-    if (signals.includes('EMA50 Üstü') && signals.includes('EMA20 Üstü')) {
-      conf.push('hem kısa hem orta vadeli trend yukarıda');
-    } else if (signals.includes('EMA50 Üstü')) {
-      conf.push('orta vadeli trend sağlıklı (EMA50 üzerinde)');
-    } else if (signals.includes('EMA20 Üstü')) {
-      conf.push('kısa vadeli trend yukarıda (EMA20 üzerinde)');
-    }
-    if (signals.includes('Yüksek ADR')) {
-      conf.push(`geniş günlük fiyat aralığıyla (ADR: %${adr.toFixed(1)}) oldukça volatil — hem fırsat hem risk içeriyor`);
-    }
-    if (conf.length) {
-      sentences.push(`Buna ek olarak: ${conf.join(', ')}.`);
-    }
-
-    // 3. Kapanış yorumu
-    const tierComment = {
-      'S': `En güçlü kurulum kategorisinde (S Kademe, puan: ${r.score}) — birden fazla kategoriden güçlü teyit var, yüksek konviksiyon sinyali.`,
-      'A': `Güçlü bir kurulum (A Kademe, puan: ${r.score}) — birden fazla kategoriden teyit alındı.`,
-      'B': `Makul bir kurulum (B Kademe, puan: ${r.score}) — dikkatli pozisyon boyutu önerilir.`,
-      'C': `Zayıf sinyal (C Kademe, puan: ${r.score}) — varsa sadece küçük bir deneme pozisyonu düşünülmeli.`,
-    };
-    sentences.push(tierComment[tier] || `Toplam puan ${r.score} — dikkatli olunması önerilir.`);
-
-    return sentences.join(' ');
-  }
-
-  // ── Strategy Modal ──────────────────────────────────────────────────────────
-
-  function openStrategy(r) {
-    const price    = r.price;
-    const chgPct   = r.change_pct;
-    const adr      = r.adr || 3.0;
-    const signals  = r.signals || [];
-
-    const prevClose   = price / (1 + chgPct / 100);
-    const hasGapCombo = signals.includes('Güçlü Momentum');
-    const hasGapUp    = signals.includes('Boşluk Yukarı');
-    const hasGap      = hasGapCombo || hasGapUp;
-
-    // ── Entry & SL logic ───────────────────────────────────────────────────
-    let entry, entryNote, sl;
-
-    if (hasGapCombo) {
-      // Strong gap+RVOL: wait for pullback to prev-close area
-      entry     = prevClose * 1.01;
-      entryNote = 'Gap-up açılış — ilk geri çekilmede veya konsolidasyon kırılımında gir. Açılışta kovalama yapma.';
-      sl        = prevClose * 0.985;
-    } else if (hasGapUp) {
-      entry     = price * 0.985;
-      entryNote = 'Boşluk yukarı — gün içi küçük geri çekilme beklenir.';
-      sl        = prevClose * 0.99;
-    } else {
-      // No gap: use ADR-based SL
-      entry     = price;
-      entryNote = 'Mevcut fiyat bölgesinde giriş yapılabilir.';
-      sl        = price * (1 - (adr / 100));
-    }
-
-    const risk = entry - sl;
-    const tp1  = entry + risk;           // 1:1 R/R
-    const tp2  = entry + risk * 2.0;     // 2:1 R/R
-
-    const riskPct  = ((entry - sl) / entry * 100).toFixed(1);
-    const tp1Pct   = ((tp1 - entry) / entry * 100).toFixed(1);
-    const tp2Pct   = ((tp2 - entry) / entry * 100).toFixed(1);
-
-    // ── Strategy notes ─────────────────────────────────────────────────────
-    const sizeMap = { S: 'Tam pozisyon', A: '2/3 pozisyon', B: '1/3 pozisyon', C: 'Küçük deneme' };
-    const posSize = sizeMap[r.tier] || 'Küçük deneme';
-
-    const noteLines = [];
-    if (hasGapCombo) noteLines.push('<strong>Gap+Hacim kombinasyonu:</strong> En güçlü setup. İlk 15 dk bekle, VWAP üzerinde kalmaya devam ederse gir.');
-    if (signals.includes('Güçlü RS')) noteLines.push('<strong>Güçlü RS:</strong> Endeksten belirgin üstün performans — süregelen ilgi var.');
-    if (signals.includes('52H Yakını')) noteLines.push('<strong>52H Yakını:</strong> Üst tarafta az direnç, trend devam edebilir.');
-    if (signals.includes('Yüksek ADR')) noteLines.push(`<strong>Yüksek ADR (${adr.toFixed(1)}%):</strong> Volatil hisse — stop çok sıkı tutulmamalı.`);
-    noteLines.push(`<strong>Pozisyon büyüklüğü (${r.tier} kademe):</strong> ${posSize}.`);
-    noteLines.push(`<strong>TP1\'de</strong> yarı pozisyonu kapat, kalan için stop\'u giriş fiyatına çek.`);
-
-    // ── Render modal ───────────────────────────────────────────────────────
-    document.getElementById('modalTicker').textContent  = r.ticker;
-    document.getElementById('modalCompany').textContent = r.company_name || '';
-
-    document.getElementById('modalInfoRow').innerHTML = `
-      <div class="modal-info-item">
-        <span class="modal-info-label">Fiyat</span>
-        <span class="modal-info-value">${fmtPrice(price)} ₺</span>
-      </div>
-      <div class="modal-info-item">
-        <span class="modal-info-label">Değişim</span>
-        <span class="modal-info-value ${changeClass(chgPct)}">${fmtChange(chgPct)}</span>
-      </div>
-      <div class="modal-info-item">
-        <span class="modal-info-label">RVOL</span>
-        <span class="modal-info-value">${fmtRvol(r.rvol)}</span>
-      </div>
-      <div class="modal-info-item">
-        <span class="modal-info-label">ADR</span>
-        <span class="modal-info-value">${adr.toFixed(1)}%</span>
-      </div>
-      <div class="modal-info-item">
-        <span class="modal-info-label">Puan / Kademe</span>
-        <span class="modal-info-value">${r.score} &nbsp;${tierBadge(r.tier)}</span>
-      </div>
-    `;
-
-    document.getElementById('modalEntry').textContent    = `${fmtPrice(entry)} ₺`;
-    document.getElementById('modalEntryNote').textContent = entryNote;
-
-    document.getElementById('modalLevels').innerHTML = `
-      <div class="level-card sl">
-        <div class="level-card-label">Stop Loss</div>
-        <div class="level-card-price">${fmtPrice(sl)} ₺</div>
-        <div class="level-card-pct">−${riskPct}%</div>
-      </div>
-      <div class="level-card tp1">
-        <div class="level-card-label">TP 1 (1:1)</div>
-        <div class="level-card-price">${fmtPrice(tp1)} ₺</div>
-        <div class="level-card-pct">+${tp1Pct}%</div>
-      </div>
-      <div class="level-card tp2">
-        <div class="level-card-label">TP 2 (2:1)</div>
-        <div class="level-card-price">${fmtPrice(tp2)} ₺</div>
-        <div class="level-card-pct">+${tp2Pct}%</div>
-      </div>
-    `;
-
-    document.getElementById('modalRiskBar').innerHTML = `
-      <span class="risk-label">Risk/İşlem:</span>
-      <span class="risk-value">${riskPct}%</span>
-      <span class="risk-label" style="margin-left:0.5rem">R/R Oranı:</span>
-      <span class="rr-value">1:2</span>
-      <span class="risk-label" style="margin-left:0.5rem">Önceki Kapanış:</span>
-      <span style="font-weight:600">${fmtPrice(prevClose)} ₺</span>
-    `;
-
-    document.getElementById('modalNotes').innerHTML = noteLines.join('<br>');
-    document.getElementById('modalAiOzet').textContent = generateAiOzet(r);
-
-    document.getElementById('strategyModal').classList.add('open');
-    document.body.style.overflow = 'hidden';
-  }
-
-  function closeModal() {
-    document.getElementById('strategyModal').classList.remove('open');
-    document.body.style.overflow = '';
-  }
-
-  function closeModalOnOverlay(e) {
-    if (e.target === document.getElementById('strategyModal')) closeModal();
-  }
-
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeModal();
-  });
-
-  // On page load, check if there are already results
-  window.addEventListener('load', async () => {
-    try {
-      const res = await fetch('/api/status');
-      const state = await res.json();
-      if (state.running) {
-        document.getElementById('scanBtn').disabled = true;
-        document.getElementById('statusBar').classList.add('visible');
-        document.getElementById('progressBar').classList.add('visible');
-        pollInterval = setInterval(pollStatus, 1500);
-      } else if (state.results && state.results.length) {
-        loadResults();
-      }
-    } catch (e) {}
-  });
+  } catch(e) {}
+});
 </script>
-</body>
-</html>
+{% endblock %}

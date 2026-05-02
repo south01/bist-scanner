@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Backtest #{{ result_id }} — BIST Tarayıcı v2{% endblock %}
+{% block nav_backtest %}active{% endblock %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;flex-wrap:wrap">
+    <a href="/backtest" class="btn btn-ghost btn-sm">← Backtest</a>
+    <h1 style="font-size:1.3rem;font-weight:800">
+      Backtest #{{ result_id }} —
+      <span style="color:var(--accent)">{{ data.config.ticker.replace('.IS','') }}</span>
+    </h1>
+    <span style="font-size:0.85rem;color:var(--text-muted)">{{ data.config.strategy }}</span>
+  </div>
+
+  {% set m = data.metrics %}
+
+  <!-- Metrics grid -->
+  <div class="metrics-grid" style="margin-bottom:1.25rem">
+    <div class="metric-card">
+      <div class="metric-label">Toplam İşlem</div>
+      <div class="metric-value neutral">{{ m.total_trades }}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Kazanma Oranı</div>
+      <div class="metric-value {{ 'pos' if m.win_rate > 50 else 'neg' }}">{{ m.win_rate }}%</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Ort. Getiri</div>
+      <div class="metric-value {{ 'pos' if m.avg_return > 0 else 'neg' }}">{{ m.avg_return }}%</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Ort. Kazanç</div>
+      <div class="metric-value pos">{{ m.avg_win }}%</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Ort. Kayıp</div>
+      <div class="metric-value neg">{{ m.avg_loss }}%</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Kar Faktörü</div>
+      <div class="metric-value {{ 'pos' if m.profit_factor > 1 else 'neg' }}">{{ m.profit_factor }}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Sharpe</div>
+      <div class="metric-value {{ 'pos' if m.sharpe > 0.5 else ('neg' if m.sharpe < 0 else 'neutral') }}">{{ m.sharpe }}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Max Drawdown</div>
+      <div class="metric-value neg">{{ m.max_drawdown }}%</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Beklenti</div>
+      <div class="metric-value {{ 'pos' if m.expectancy > 0 else 'neg' }}">{{ m.expectancy }}%</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Toplam Getiri</div>
+      <div class="metric-value {{ 'pos' if m.total_return > 0 else 'neg' }}">{{ m.total_return }}%</div>
+    </div>
+  </div>
+
+  <!-- Equity curve -->
+  {% if m.equity_curve %}
+  <div class="card" style="margin-bottom:1.25rem">
+    <div class="section-title" style="margin-bottom:0.75rem">Sermaye Eğrisi</div>
+    <canvas id="equityChart" style="max-height:220px"></canvas>
+  </div>
+  {% endif %}
+
+  <!-- Filter sweep -->
+  {% if data.sweep %}
+  <div class="card" style="margin-bottom:1.25rem">
+    <div class="section-title" style="margin-bottom:0.75rem">Filtre Duyarlılık Taraması</div>
+    <div style="overflow-x:auto">
+      <table class="comparison-table">
+        <thead><tr><th>Filtre</th><th>İşlem</th><th>Kazanma%</th><th>Ort.Getiri%</th><th>Kar Faktörü</th><th>Sharpe</th></tr></thead>
+        <tbody>
+          {% for name, v in data.sweep.items() %}
+          <tr>
+            <td style="font-weight:600">{{ name }}</td>
+            <td>{{ v.metrics.total_trades }}</td>
+            <td class="{{ 'pos' if v.metrics.win_rate > 50 else 'neg' }}">{{ v.metrics.win_rate }}%</td>
+            <td class="{{ 'pos' if v.metrics.avg_return > 0 else 'neg' }}">{{ v.metrics.avg_return }}%</td>
+            <td class="{{ 'pos' if v.metrics.profit_factor > 1 else 'neg' }}">{{ v.metrics.profit_factor }}</td>
+            <td class="{{ 'pos' if v.metrics.sharpe > 0.5 else ('neg' if v.metrics.sharpe < 0 else '') }}">{{ v.metrics.sharpe }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Trade log -->
+  <div class="card">
+    <div class="section-title" style="margin-bottom:0.75rem">İşlem Günlüğü ({{ data.trades | length }} işlem)</div>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr>
+          <th>#</th><th>Giriş Tarihi</th><th>Çıkış Tarihi</th>
+          <th>Giriş</th><th>Çıkış</th><th>Getiri%</th>
+          <th>Gün</th><th>Çıkış Nedeni</th><th>MAE%</th><th>MFE%</th>
+        </tr></thead>
+        <tbody>
+          {% for i, t in data.trades | enumerate %}
+          <tr>
+            <td style="color:var(--text-muted);font-size:0.82rem">{{ i+1 }}</td>
+            <td style="font-family:'Space Mono',monospace;font-size:0.82rem">{{ t.entry_date }}</td>
+            <td style="font-family:'Space Mono',monospace;font-size:0.82rem">{{ t.exit_date }}</td>
+            <td style="font-family:'Space Mono',monospace">{{ "%.2f"|format(t.entry_price) }}</td>
+            <td style="font-family:'Space Mono',monospace">{{ "%.2f"|format(t.exit_price) }}</td>
+            <td class="{{ 'pos' if t.return_pct > 0 else 'neg' }}" style="font-weight:700">
+              {{ '+' if t.return_pct > 0 else '' }}{{ "%.2f"|format(t.return_pct) }}%
+            </td>
+            <td>{{ t.hold_days }}</td>
+            <td style="font-size:0.8rem;color:var(--text-muted)">{{ '⛔ Stop' if t.exit_reason == 'stop' else '⏱ Süre' }}</td>
+            <td class="neg" style="font-size:0.82rem">{{ "%.2f"|format(t.mae) }}%</td>
+            <td class="pos" style="font-size:0.82rem">{{ "%.2f"|format(t.mfe) }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if m.equity_curve %}
+<script>
+const equityData = {{ m.equity_curve | tojson }};
+const labels = equityData.map((_, i) => i === 0 ? 'Başlangıç' : 'İşlem ' + i);
+const ctx = document.getElementById('equityChart').getContext('2d');
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels,
+    datasets: [{
+      data: equityData.map(v => parseFloat((v * 100 - 100).toFixed(2))),
+      borderColor: equityData[equityData.length-1] >= equityData[0] ? '#4ade80' : '#f87171',
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: true,
+      backgroundColor: equityData[equityData.length-1] >= equityData[0]
+        ? 'rgba(74,222,128,0.08)' : 'rgba(248,113,113,0.08)',
+      tension: 0.3,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: '#8b949e', maxTicksLimit: 10 }, grid: { color: '#21262d' } },
+      y: {
+        ticks: { color: '#8b949e', callback: v => v + '%' },
+        grid: { color: '#21262d' },
+        title: { display: true, text: 'Kümülatif Getiri (%)', color: '#8b949e' },
+      }
+    }
+  }
+});
+</script>
+{% endif %}
+{% endblock %}
