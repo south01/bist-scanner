@@ -142,22 +142,24 @@ def _score_stock(
 def _extract_ticker(raw: pd.DataFrame, ticker: str, single: bool) -> pd.DataFrame | None:
     """
     Extract a single ticker's OHLCV DataFrame from a yf.download result.
-    Handles both old (Ticker, Price) and new (Price, Ticker) MultiIndex layouts,
-    as well as single-ticker flat DataFrames.
+    Handles flat DataFrames, (Ticker,Price) layout (group_by="ticker"),
+    and (Price,Ticker) layout (yfinance default / 0.2.54+).
     """
     if raw is None or raw.empty:
         return None
-    if single:
+    if single or raw.columns.nlevels == 1:
+        # Single-ticker download or flat result — return as-is
         return raw.copy()
     if raw.columns.nlevels == 2:
         lvl0 = raw.columns.get_level_values(0).unique()
         lvl1 = raw.columns.get_level_values(1).unique()
-        if ticker in lvl0:
-            # Old layout: (Ticker, Price) — group_by="ticker"
-            return raw[ticker].copy()
-        elif ticker in lvl1:
-            # New layout (yfinance 0.2.54+): (Price, Ticker)
-            return raw.xs(ticker, level=1, axis=1).copy()
+        # Try exact match first, then base name (without .IS)
+        base = ticker.replace(".IS", "")
+        for t in (ticker, base):
+            if t in lvl0:
+                return raw[t].copy()
+            if t in lvl1:
+                return raw.xs(t, level=1, axis=1).copy()
     return None
 
 
@@ -198,6 +200,7 @@ def run_scan(
     ticker_batches = [tickers[i:i + BATCH_SIZE] for i in range(0, total, BATCH_SIZE)]
     logger.info(f"Downloading {total} tickers in {len(ticker_batches)} batches...")
 
+    _logged_schema = False  # log column layout once
     for batch_idx, batch in enumerate(ticker_batches):
         try:
             batch_str = " ".join(batch)
@@ -205,13 +208,24 @@ def run_scan(
                 batch_str, period="1y", interval="1d",
                 progress=False, auto_adjust=True,
             )
+            if not _logged_schema and raw is not None and not raw.empty:
+                logger.info(
+                    f"yfinance schema — nlevels={raw.columns.nlevels} "
+                    f"lvl0={list(raw.columns.get_level_values(0).unique()[:3])} "
+                    f"lvl1={list(raw.columns.get_level_values(1).unique()[:3]) if raw.columns.nlevels > 1 else 'N/A'}"
+                )
+                _logged_schema = True
+            extracted = 0
             for ticker in batch:
                 try:
                     df = _extract_ticker(raw, ticker, single=(len(batch) == 1))
                     if df is not None and not df.empty:
                         all_hist[ticker] = df.dropna(how="all")
+                        extracted += 1
                 except Exception as e:
                     logger.debug(f"Extract error {ticker}: {e}")
+            if extracted == 0 and len(batch) > 1:
+                logger.warning(f"Batch {batch_idx}: 0/{len(batch)} tickers extracted — check yfinance schema")
         except Exception as e:
             logger.warning(f"Batch {batch_idx} download error: {e}")
 

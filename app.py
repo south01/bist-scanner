@@ -402,6 +402,35 @@ async def health():
     return {"status": "ok", "version": APP_VERSION}
 
 
+@app.get("/api/debug/download")
+async def debug_download():
+    """Probe yfinance with 3 tickers — shows raw column structure and extraction result."""
+    import yfinance as yf
+    probes = ["THYAO.IS", "AKBNK.IS", "GARAN.IS"]
+    batch_str = " ".join(probes)
+    try:
+        raw = yf.download(batch_str, period="5d", interval="1d",
+                          progress=False, auto_adjust=True)
+        info = {
+            "empty": raw.empty,
+            "shape": list(raw.shape),
+            "nlevels": raw.columns.nlevels,
+            "level0": list(raw.columns.get_level_values(0).unique()) if raw.columns.nlevels >= 1 else [],
+            "level1": list(raw.columns.get_level_values(1).unique()) if raw.columns.nlevels >= 2 else [],
+            "index_tail": [str(i) for i in raw.index[-3:]] if not raw.empty else [],
+        }
+        from scorer import _extract_ticker
+        for t in probes:
+            df = _extract_ticker(raw, t, single=False)
+            info[f"extracted_{t}"] = (
+                {"rows": len(df), "cols": list(df.columns), "last_close": float(df["Close"].iloc[-1])}
+                if df is not None and not df.empty else None
+            )
+        return info
+    except Exception as e:
+        return {"error": str(e)}
+
+
 # ── Dev entry point ───────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
