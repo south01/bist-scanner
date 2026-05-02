@@ -139,6 +139,28 @@ def _score_stock(
     return result
 
 
+def _extract_ticker(raw: pd.DataFrame, ticker: str, single: bool) -> pd.DataFrame | None:
+    """
+    Extract a single ticker's OHLCV DataFrame from a yf.download result.
+    Handles both old (Ticker, Price) and new (Price, Ticker) MultiIndex layouts,
+    as well as single-ticker flat DataFrames.
+    """
+    if raw is None or raw.empty:
+        return None
+    if single:
+        return raw.copy()
+    if raw.columns.nlevels == 2:
+        lvl0 = raw.columns.get_level_values(0).unique()
+        lvl1 = raw.columns.get_level_values(1).unique()
+        if ticker in lvl0:
+            # Old layout: (Ticker, Price) — group_by="ticker"
+            return raw[ticker].copy()
+        elif ticker in lvl1:
+            # New layout (yfinance 0.2.54+): (Price, Ticker)
+            return raw.xs(ticker, level=1, axis=1).copy()
+    return None
+
+
 def run_scan(
     tickers: list[str],
     progress_callback=None,
@@ -182,17 +204,10 @@ def run_scan(
             raw = yf.download(
                 batch_str, period="1y", interval="1d",
                 progress=False, auto_adjust=True,
-                group_by="ticker", threads=True,
             )
             for ticker in batch:
                 try:
-                    if len(batch) == 1:
-                        df = raw.copy() if not raw.empty else None
-                    else:
-                        if ticker in raw.columns.get_level_values(0):
-                            df = raw[ticker].copy()
-                        else:
-                            df = None
+                    df = _extract_ticker(raw, ticker, single=(len(batch) == 1))
                     if df is not None and not df.empty:
                         all_hist[ticker] = df.dropna(how="all")
                 except Exception as e:
@@ -213,7 +228,6 @@ def run_scan(
             today_raw = yf.download(
                 batch_str, period="1d", interval="1d",
                 progress=False, auto_adjust=True,
-                group_by="ticker", threads=True,
             )
             if today_raw is None or today_raw.empty:
                 continue
@@ -221,12 +235,9 @@ def run_scan(
                 if ticker not in all_hist:
                     continue
                 try:
-                    if len(batch) == 1:
-                        today_df = today_raw.copy()
-                    else:
-                        if ticker not in today_raw.columns.get_level_values(0):
-                            continue
-                        today_df = today_raw[ticker].copy()
+                    today_df = _extract_ticker(today_raw, ticker, single=(len(batch) == 1))
+                    if today_df is None:
+                        continue
                     today_df = today_df.dropna(how="all")
                     if today_df.empty:
                         continue
