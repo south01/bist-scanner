@@ -247,6 +247,9 @@ async def api_analyze(ticker: str):
             ticker_yf, period="1y", interval="1d",
             progress=False, auto_adjust=True,
         )
+        # yfinance 1.x+ returns MultiIndex (Price, Ticker) even for single-ticker downloads.
+        if hist is not None and not hist.empty and hist.columns.nlevels == 2:
+            hist.columns = hist.columns.get_level_values(0)
         if hist is None or hist.empty:
             raise HTTPException(status_code=404, detail="Hisse verisi bulunamadı")
 
@@ -254,6 +257,8 @@ async def api_analyze(ticker: str):
             "XU100.IS", period="1y", interval="1d",
             progress=False, auto_adjust=True,
         )
+        if xu100 is not None and not xu100.empty and xu100.columns.nlevels == 2:
+            xu100.columns = xu100.columns.get_level_values(0)
         index_change = 0.0
         if xu100 is not None and len(xu100) >= 2:
             c = xu100["Close"].dropna()

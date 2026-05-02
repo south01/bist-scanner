@@ -142,18 +142,25 @@ def _score_stock(
 def _extract_ticker(raw: pd.DataFrame, ticker: str, single: bool) -> pd.DataFrame | None:
     """
     Extract a single ticker's OHLCV DataFrame from a yf.download result.
-    Handles flat DataFrames, (Ticker,Price) layout (group_by="ticker"),
-    and (Price,Ticker) layout (yfinance default / 0.2.54+).
+    Always returns a flat-column DataFrame (no MultiIndex).
+    Handles:
+      - flat columns (nlevels=1)
+      - (Ticker, Price) layout (old yfinance)
+      - (Price, Ticker) layout (yfinance 1.x+ default, including single-ticker downloads)
     """
     if raw is None or raw.empty:
         return None
-    if single or raw.columns.nlevels == 1:
-        # Single-ticker download or flat result — return as-is
+    if raw.columns.nlevels == 1:
         return raw.copy()
     if raw.columns.nlevels == 2:
         lvl0 = raw.columns.get_level_values(0).unique()
         lvl1 = raw.columns.get_level_values(1).unique()
-        # Try exact match first, then base name (without .IS)
+        if single:
+            # yfinance 1.x+ returns MultiIndex even for single-ticker downloads.
+            # Flatten by keeping level-0 names (price fields like Close/High/…).
+            df = raw.copy()
+            df.columns = df.columns.get_level_values(0)
+            return df
         base = ticker.replace(".IS", "")
         for t in (ticker, base):
             if t in lvl0:
@@ -184,6 +191,9 @@ def run_scan(
         xu100_hist = yf.download(
             "XU100.IS", period="1y", interval="1d", progress=False, auto_adjust=True
         )
+        # yfinance 1.x+ returns MultiIndex even for single-ticker downloads — flatten it.
+        if xu100_hist is not None and not xu100_hist.empty and xu100_hist.columns.nlevels == 2:
+            xu100_hist.columns = xu100_hist.columns.get_level_values(0)
         if xu100_hist is not None and len(xu100_hist) >= 2:
             c = xu100_hist["Close"].dropna()
             if len(c) >= 2:
