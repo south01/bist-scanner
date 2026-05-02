@@ -60,11 +60,11 @@ def score_structure(hist: pd.DataFrame, index_change: float = 0.0) -> dict:
     if gap_pct > 5.0:
         result["gap_type"] = "gap_and_go" if day_change > 0 else "gap_fade"
         score += 25
-        signals.append(f"Gap up {gap_pct:.1f}%")
+        signals.append("Gap Up (Large)")
     elif gap_pct > 2.0:
         result["gap_type"] = "gap_up"
         score += 15
-        signals.append(f"Gap up {gap_pct:.1f}%")
+        signals.append("Gap Up")
     elif gap_pct < -2.0:
         result["gap_type"] = "gap_down"
         score -= 10
@@ -115,16 +115,16 @@ def score_structure(hist: pd.DataFrame, index_change: float = 0.0) -> dict:
     rs = day_change - index_change
     if rs >= 3.0:
         score += 15
-        signals.append(f"RS strong +{rs:.1f}%")
+        signals.append("RS Strong")
     elif rs >= 1.0:
         score += 8
-        signals.append(f"RS positive +{rs:.1f}%")
+        signals.append("RS Positive")
 
     # ── ADR (volatility) ─────────────────────────────────────────────────
     adr = _adr(hist)
     if adr >= 4.0:
         score += 5
-        signals.append(f"ADR {adr:.1f}%")
+        signals.append("High ADR")
 
     atr_val = _atr(hist)
 

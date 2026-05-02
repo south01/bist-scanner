@@ -111,38 +111,38 @@ def score_momentum(hist: pd.DataFrame) -> dict:
     if np.isfinite(rsi):
         if 50 < rsi <= 70:
             score += 20
-            signals.append(f"RSI bullish zone ({rsi:.0f})")
+            signals.append("RSI Bullish")
         elif rsi > 70:
             score += 10
-            signals.append(f"RSI overbought ({rsi:.0f})")
+            signals.append("RSI Overbought")
         elif 40 <= rsi <= 50:
             score += 8
-            signals.append(f"RSI neutral ({rsi:.0f})")
+            signals.append("RSI Neutral")
         elif rsi < 30:
             score += 5
-            signals.append(f"RSI oversold ({rsi:.0f})")
+            signals.append("RSI Oversold")
 
     # ── RVOL ─────────────────────────────────────────────────────────────
     rvol = _rvol(hist)
     if rvol >= 3.0:
         score += 20
-        signals.append(f"RVOL {rvol:.1f}x (extreme)")
+        signals.append("RVOL Extreme")
     elif rvol >= 2.0:
         score += 12
-        signals.append(f"RVOL {rvol:.1f}x (high)")
+        signals.append("RVOL High")
     elif rvol >= 1.5:
         score += 6
-        signals.append(f"RVOL {rvol:.1f}x (elevated)")
+        signals.append("RVOL Elevated")
 
     # ── ADX ──────────────────────────────────────────────────────────────
     adx = _adx(hist)
     if np.isfinite(adx):
         if adx >= 30:
             score += 15
-            signals.append(f"ADX strong trend ({adx:.0f})")
+            signals.append("ADX Strong")
         elif adx >= 20:
             score += 8
-            signals.append(f"ADX moderate ({adx:.0f})")
+            signals.append("ADX Moderate")
 
     score = max(0.0, min(100.0, score))
     result["score"] = round(score, 1)

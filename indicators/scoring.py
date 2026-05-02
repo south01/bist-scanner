@@ -62,10 +62,10 @@ def _score_smart_money(hist: pd.DataFrame) -> dict:
         up_ratio = up_vol / (up_vol + down_vol)
         if up_ratio > 0.7:
             score += 20
-            signals.append(f"Accumulation pattern ({up_ratio:.0%} up-vol)")
+            signals.append("Accumulation")
         elif up_ratio > 0.55:
             score += 10
-            signals.append("Mild accumulation")
+            signals.append("Mild Accumulation")
         elif up_ratio < 0.35:
             score -= 20
             signals.append("Distribution pattern")
@@ -77,7 +77,7 @@ def _score_smart_money(hist: pd.DataFrame) -> dict:
         vol_trend = vol_5d / vol_20d
         if vol_trend > 1.5:
             score += 15
-            signals.append(f"Volume surge ({vol_trend:.1f}x recent avg)")
+            signals.append("Volume Surge")
         elif vol_trend > 1.2:
             score += 8
             signals.append("Volume rising")
@@ -134,25 +134,25 @@ def _score_catalyst(hist: pd.DataFrame, index_change: float = 0.0) -> dict:
 
     if gap_pct > 5 and rvol >= 3.0:
         score = 90
-        signals.append(f"Gap+Volume combo ({gap_pct:.1f}% gap, {rvol:.1f}x vol)")
+        signals.append("Gap+Volume Combo")
     elif gap_pct > 3 and rvol >= 2.0:
         score = 70
-        signals.append(f"Gap up {gap_pct:.1f}% with elevated volume {rvol:.1f}x")
+        signals.append("Gap Up + Volume")
     elif gap_pct > 2:
         score = 45
-        signals.append(f"Gap up {gap_pct:.1f}%")
+        signals.append("Gap Up")
     elif rvol >= 3.0:
         score = 55
-        signals.append(f"Volume explosion {rvol:.1f}x (no gap)")
+        signals.append("Volume Explosion")
     elif rvol >= 2.0:
         score = 30
-        signals.append(f"Volume elevated {rvol:.1f}x")
+        signals.append("Volume Elevated")
 
     # RS outperformance amplifies catalyst
     rs = day_chg - index_change
     if rs >= 3.0:
         score = min(score + 15, 100)
-        signals.append(f"RS outperformance +{rs:.1f}%")
+        signals.append("RS Outperformance")
 
     score = max(0.0, min(100.0, score))
     result["score"] = round(score, 1)
