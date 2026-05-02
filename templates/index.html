@@ -23,6 +23,7 @@
   <div id="timestampBlock" style="display:none;text-align:center;margin-bottom:1rem;">
     <div style="font-size:0.9rem;color:var(--text-muted)" id="tsAdana"></div>
     <div style="font-size:0.78rem;color:#4b5563;margin-top:2px" id="tsKitchener"></div>
+    <div style="font-size:0.72rem;color:#9ca3af;margin-top:3px" id="tsVersion"></div>
   </div>
 
   <!-- Summary pills -->
@@ -256,7 +257,7 @@ function resetFilter() {
   renderTable(allResults);
 }
 
-function renderResults(results, tsAdana, tsKitchener) {
+function renderResults(results, tsAdana, tsKitchener, version) {
   allResults = results;
   allSignals = new Set(results.flatMap(r => r.signals || []));
   renderSummary(results);
@@ -268,6 +269,7 @@ function renderResults(results, tsAdana, tsKitchener) {
     document.getElementById('timestampBlock').style.display = 'block';
     document.getElementById('tsAdana').textContent = `Son tarama: ${tsAdana} (İstanbul)`;
     document.getElementById('tsKitchener').textContent = `Kitchener: ${tsKitchener}`;
+    document.getElementById('tsVersion').textContent = version ? `v${version}` : '';
   }
 }
 
@@ -323,7 +325,7 @@ async function loadResults() {
   try {
     const res  = await fetch('/api/results');
     const data = await res.json();
-    renderResults(data.results, data.last_scan_adana, data.last_scan_kitchener);
+    renderResults(data.results, data.last_scan_adana, data.last_scan_kitchener, data.version);
   } catch(e) { showError('Sonuçlar yüklenemedi.'); }
 }
 

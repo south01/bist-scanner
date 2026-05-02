@@ -31,6 +31,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+APP_VERSION  = "2.1.0"  # bump this on each release
+
 TZ_ISTANBUL  = pytz.timezone("Europe/Istanbul")
 TZ_KITCHENER = pytz.timezone("America/Toronto")
 
@@ -172,7 +174,7 @@ templates.env.globals["enumerate"] = enumerate
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(request, "index.html", {})
+    return templates.TemplateResponse(request, "index.html", {"app_version": APP_VERSION})
 
 
 @app.post("/api/scan")
@@ -202,6 +204,7 @@ async def get_results():
             "last_scan_adana":     _scan_state["last_scan_adana"],
             "last_scan_kitchener": _scan_state["last_scan_kitchener"],
             "count":               len(_scan_state["results"]),
+            "version":             APP_VERSION,
         }
 
 
@@ -396,7 +399,7 @@ async def api_backtest_list():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "2.0"}
+    return {"status": "ok", "version": APP_VERSION}
 
 
 # ── Dev entry point ───────────────────────────────────────────────────────────
